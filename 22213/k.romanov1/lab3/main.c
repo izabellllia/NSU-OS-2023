@@ -4,7 +4,6 @@
 
 
 int main (int argc, char *argv[]) {
-
     FILE * file;
     fprintf(stdout, "actual user's id = %d, effective user's id = %d\n", getuid(), geteuid());    
 
