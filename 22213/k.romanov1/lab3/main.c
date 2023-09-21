@@ -7,6 +7,7 @@ int main (int argc, char *argv[]) {
 
     FILE * file;
     fprintf(stdout, "actual user's id = %d, effective user's id = %d\n", getuid(), geteuid());    
+
     if (argc == 1) {
         fprintf(stderr, "stdin hasn't name of file\n");
         exit(1);
