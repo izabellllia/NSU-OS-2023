@@ -6,20 +6,18 @@
 int main (int argc, char *argv[]) {
 
     FILE * file;
-    fprintf(stdout, "actual user's id = %d, effective user's id = %d\n", getuid(), geteuid());
-    
+    fprintf(stdout, "actual user's id = %d, effective user's id = %d\n", getuid(), geteuid());    
     if (argc == 1) {
         fprintf(stderr, "stdin hasn't name of file\n");
         exit(1);
     }
-
     file = fopen(argv[1], "r");
     if (!file)
         perror("");
     else
         fclose(file);
 
-    setuid(0);
+    setuid(getuid());
 
     fprintf(stdout, "actual user's id = %d, effective user's id = %d\n", getuid(), geteuid());
     
