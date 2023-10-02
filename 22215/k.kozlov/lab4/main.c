@@ -106,7 +106,13 @@ void freeList(List *list) {
 }
 
 /*
-fgets
+fgets(3) - char* fgets(char* s, int size, FILE* stream) - 
+	читает из stream либо size - 1 символов, либо до конца файла или конца строки
+	Возвращает NULL и записывает его в s, если возникла ошибка либо данные с потока закончились
+
+	read(2) - ssize_t read(int fd, void* buf, size_t count) -
+		пытается прочитать из дескриптора файла до count байтов и записать их в буфер по адресу buf
+		возвращает количество считанных байтов
 */
 
 #define BUFF_SZ 1025
