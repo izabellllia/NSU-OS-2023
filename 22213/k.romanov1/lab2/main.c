@@ -7,11 +7,14 @@ int main()
 {
         time_t now = time(NULL);
         const int lenBuf = 26;
+        char buf[lenBuf];
 
-        char * buf = (char*)malloc(sizeof(char)*lenBuf);
-        putenv("TZ=GMT+7");
+        if (putenv("TZ=GMT+7") != 0) {
+            perror("");
+            exit(1);
+        }
         printf("%s\n", ctime_r(&now, buf, lenBuf));
-        return 0;
+        exit(0);
 }
 
 
