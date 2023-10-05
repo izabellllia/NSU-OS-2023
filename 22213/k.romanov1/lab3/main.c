@@ -20,10 +20,11 @@ void tryOpenFile(const char* name) {
 
 int main (int argc, char *argv[]) {
     if (argc == 1) {
-        fprintf(stderr, "there is no arguments\n");
+        perror("there is no arguments\n");
         exit(1);
     }
-    fprintf(stdout, "actual user's id = %d, effective user's id = %d\n", getuid(), geteuid());    
+    printf("actual user's id = %d, effective user's id = %d\n", getuid(), geteuid());
+
     tryOpenFile(argv[1]);
     
     if (setuid(getuid()) == -1) {
@@ -31,7 +32,7 @@ int main (int argc, char *argv[]) {
         exit(1);
     }
 
-    fprintf(stdout, "actual user's id = %d, effective user's id = %d\n", getuid(), geteuid());
+    printf("actual user's id = %d, effective user's id = %d\n", getuid(), geteuid());
     
     tryOpenFile(argv[1]);
 
