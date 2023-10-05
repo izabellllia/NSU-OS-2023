@@ -1,31 +1,40 @@
 #include <stdio.h>
-#include <stdlib.h>
+#include <errno.h>
+#include <ucred.h>
 #include <unistd.h>
+#include <fcntl.h>
+#include <stdlib.h>
 
+
+void tryOpenFile(const char* name) {
+    FILE * file = fopen(name, O_RDONLY);
+    if (!file) {
+        perror("can't open file");
+        return;
+    }
+    if (fclose(file) != 0) {
+        perror("cant't close file");
+        return;
+    }
+}
 
 int main (int argc, char *argv[]) {
-    FILE * file;
-    fprintf(stdout, "actual user's id = %d, effective user's id = %d\n", getuid(), geteuid());    
-
     if (argc == 1) {
-        fprintf(stderr, "stdin hasn't name of file\n");
+        fprintf(stderr, "there is no arguments\n");
         exit(1);
     }
-    file = fopen(argv[1], "r");
-    if (!file)
+    fprintf(stdout, "actual user's id = %d, effective user's id = %d\n", getuid(), geteuid());    
+    tryOpenFile(argv[1]);
+    
+    if (setuid(getuid()) == -1) {
         perror("");
-    else
-        fclose(file);
-
-    setuid(getuid());
+        exit(1);
+    }
 
     fprintf(stdout, "actual user's id = %d, effective user's id = %d\n", getuid(), geteuid());
     
-    file = fopen(argv[1], "r");
-    if (!file)
-        perror("");
-    else 
-        fclose(file);
+    tryOpenFile(argv[1]);
 
-    return 0;
+    exit(0);
 }
+
