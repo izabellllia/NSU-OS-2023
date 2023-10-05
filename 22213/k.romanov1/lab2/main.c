@@ -10,7 +10,7 @@ int main()
         char buf[lenBuf];
 
         if (putenv("TZ=GMT+7") != 0) {
-            perror("");
+            perror("failed to putenv");
             exit(1);
         }
         printf("%s\n", ctime_r(&now, buf, lenBuf));
