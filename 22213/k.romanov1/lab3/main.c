@@ -28,7 +28,7 @@ int main (int argc, char *argv[]) {
     tryOpenFile(argv[1]);
     
     if (setuid(getuid()) == -1) {
-        perror("");
+        perror("failed to set uid");
         exit(1);
     }
 
