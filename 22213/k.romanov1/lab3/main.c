@@ -7,6 +7,7 @@
 
 void tryOpenFile(const char* name) {
     FILE * file = fopen(name, "r");
+
     if (file == NULL) {
         perror("can't open file");
         return;
