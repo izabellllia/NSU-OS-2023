@@ -2,19 +2,17 @@
 #include <errno.h>
 #include <ucred.h>
 #include <unistd.h>
-#include <fcntl.h>
 #include <stdlib.h>
 
 
 void tryOpenFile(const char* name) {
-    FILE * file = fopen(name, O_RDONLY);
-    if (!file) {
+    FILE * file = fopen(name, "r");
+    if (file == NULL) {
         perror("can't open file");
         return;
     }
-    if (fclose(file) != 0) {
+    if (fclose(file)) {
         perror("cant't close file");
-        return;
     }
 }
 
@@ -27,8 +25,8 @@ int main (int argc, char *argv[]) {
 
     tryOpenFile(argv[1]);
     
-    if (setuid(getuid()) == -1) {
-        perror("failed to set uid");
+    if (setuid(getuid())) {
+        perror("failed to set euid");
         exit(1);
     }
 
@@ -38,4 +36,3 @@ int main (int argc, char *argv[]) {
 
     exit(0);
 }
-
