@@ -3,16 +3,15 @@
 #include <ucred.h>
 #include <unistd.h>
 #include <stdlib.h>
-
+#include <fcntl.h>
 
 void tryOpenFile(const char* name) {
-    FILE * file = fopen(name, "r");
-
-    if (file == NULL) {
+    int file = open(name, O_RDONLY);
+    if (file == -1) {
         perror("can't open file");
         return;
     }
-    if (fclose(file)) {
+    if (close(file) == -1) {
         perror("cant't close file");
     }
 }
@@ -37,3 +36,4 @@ int main (int argc, char *argv[]) {
 
     exit(0);
 }
+
