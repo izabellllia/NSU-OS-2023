@@ -7,7 +7,6 @@ static char *blankskip(register char *);
 int parseline(char *line) {
     int nargs, ncmds;
     register char *s;
-    char aflg = 0;
     int rval;
     register int i;
     static char delim[] = " \t|&<>;\n";
@@ -15,7 +14,6 @@ int parseline(char *line) {
     /* initialize  */
     bkgrnd = nargs = ncmds = rval = 0;
     s = line;
-    infile = outfile = appfile = (char *) NULL;
     cmds[0].cmdargs[0] = (char *) NULL;
     for (i = 0; i < MAXCMDS; i++)
         cmds[i].cmdflag = 0;
@@ -27,13 +25,21 @@ int parseline(char *line) {
         /*  handle <, >, |, &, and ;  */
         switch(*s) {
             case '&':
-                ++bkgrnd;
+                if (*(s+1) == '&') {
+                    ++ncmds;
+                    nargs = 0;
+                    *s++ = '\0';
+                } else {
+                    ++bkgrnd;
+                }
                 *s++ = '\0';
                 break;
             case '>':
                 if (*(s+1) == '>') {
-                    ++aflg;
                     *s++ = '\0';
+                    cmds[ncmds].cmdflag = OUTFILEAP;
+                } else {
+                    cmds[ncmds].cmdflag = OUTFILE;
                 }
                 *s++ = '\0';
                 s = blankskip(s);
@@ -42,10 +48,7 @@ int parseline(char *line) {
                     return(-1);
                 }
 
-                if (aflg)
-                    appfile = s;
-                else
-                    outfile = s;
+                cmds[ncmds].outfile = s;
                 s = strpbrk(s, delim);
                 if (isspace(*s))
                     *s++ = '\0';
@@ -53,22 +56,22 @@ int parseline(char *line) {
             case '<':
                 *s++ = '\0';
                 s = blankskip(s);
-                if (!*s) {
+                if (!*s || (cmds[ncmds].cmdflag & INPIPE)) {
                     fprintf(stderr, "syntax error\n");
                     return(-1);
                 }
-                infile = s;
+                cmds[ncmds].infile = s;
                 s = strpbrk(s, delim);
                 if (isspace(*s))
                     *s++ = '\0';
                 break;
             case '|':
-                if (nargs == 0) {
+                if (nargs == 0 || (cmds[ncmds].cmdflag & (OUTFILE | OUTFILEAP))) {
                     fprintf(stderr, "syntax error\n");
                     return(-1);
                 }
-                cmds[ncmds++].cmdflag |= OUTPIP;
-                cmds[ncmds].cmdflag |= INPIP;
+                cmds[ncmds++].cmdflag |= OUTPIPE;
+                cmds[ncmds].cmdflag |= INPIPE;
                 *s++ = '\0';
                 nargs = 0;
                 break;
@@ -97,7 +100,7 @@ int parseline(char *line) {
      *  no command on the right side of a pipe
      *  no command to the left of a pipe is checked above
      */
-    if (cmds[ncmds-1].cmdflag & OUTPIP) {
+    if (cmds[ncmds-1].cmdflag & OUTPIPE) {
         if (nargs == 0) {
             fprintf(stderr, "syntax error\n");
             return(-1);

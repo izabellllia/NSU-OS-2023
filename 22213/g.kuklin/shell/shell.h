@@ -4,11 +4,15 @@
 struct command {
     char *cmdargs[MAXARGS];
     char cmdflag;
+    char *infile, *outfile;
 };
 
 /*  cmdflag's  */
-#define OUTPIP  01
-#define INPIP   02
+#define OUTPIPE    0x01
+#define OUTFILE    0x02
+#define OUTFILEAP  0x04
+#define INFILE     0x08
+#define INPIPE     0x10
 
 extern struct command cmds[];
 extern char *infile, *outfile, *appfile;
