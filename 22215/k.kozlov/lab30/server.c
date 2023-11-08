@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <ctype.h>
+#include <signal.h>
 
 /*
 Что такое сокет?
@@ -58,6 +59,10 @@ void intPerrorTrigger(int value, char* errorMessage) {
   }
 }
 
+void handleSigInt(int signalValue) {
+  exit(signalValue);
+}
+
 void toUpperString(int sz, char* str) {
   for (int i = 0; i < sz; ++i) {
     str[i] = (char)toupper((int)str[i]);
@@ -68,12 +73,13 @@ void toUpperString(int sz, char* str) {
 int serverSocketDescriptor;
 
 void closeServerSocket() {
-  printf("Server closed\n");
+  printf("\nServer closed\n");
   intPerrorTrigger(close(serverSocketDescriptor), "Failed to close server socket");
   intPerrorTrigger(unlink(SERVER_SOCKET_NAME), "Failed to unlink server socket file");
 }
 
 int main(int argc, char** argv) {
+  signal(SIGINT, handleSigInt);
   serverSocketDescriptor = socket(AF_UNIX, SOCK_STREAM, 0);
   intPerrorTrigger(serverSocketDescriptor, "Failed to create socket");
   atexit(closeServerSocket);

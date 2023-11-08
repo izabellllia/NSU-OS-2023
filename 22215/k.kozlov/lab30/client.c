@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <signal.h>
 
 void intPerrorTrigger(int value, char* errorMessage) {
   if ((value) == -1) {
@@ -12,15 +13,20 @@ void intPerrorTrigger(int value, char* errorMessage) {
   }
 }
 
+void handleSigInt(int signalValue) {
+  exit(signalValue);
+}
+
 #define SERVER_SOCKET_NAME "socket.sock"
 int clientSocketDescriptor;
 
 void closeClientSocket() {
-  printf("Connection closed\n");
+  printf("\nClient closed\n");
   intPerrorTrigger(close(clientSocketDescriptor), "Failed to close client socket");
 }
 
 int main(int argc, char** argv) {
+  signal(SIGINT, handleSigInt);
   clientSocketDescriptor = socket(AF_UNIX, SOCK_STREAM, 0);
   intPerrorTrigger(clientSocketDescriptor, "Failed to create socket");
   atexit(closeClientSocket);
