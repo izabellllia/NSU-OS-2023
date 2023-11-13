@@ -129,5 +129,5 @@ int main(int argc, char** argv) {
     toUpperString(bytesRead, buf);
     intPerrorTrigger(write(1, buf, bytesRead), "Failed to write processed text");
   }
-  exit(0);
+  return 0;
 }

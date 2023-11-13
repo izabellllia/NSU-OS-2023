@@ -49,5 +49,5 @@ int main(int argc, char** argv) {
       break;
     intPerrorTrigger(write(clientSocketDescriptor, buf, len), "Failed to send text by socket");
   }
-  exit(0);
+  return 0;
 }
