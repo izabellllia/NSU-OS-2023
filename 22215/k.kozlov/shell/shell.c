@@ -5,8 +5,8 @@
 #include <stdlib.h>
 #include <errno.h>
 #include <string.h>
-#include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/wait.h>
 #include <fcntl.h>
 
 #include "shell.h"
@@ -30,14 +30,35 @@ void execWrapper(char** argv) {
 	}
 }
 
+void checkInputOutputRedirection(int currentCmdIndex, int cmdsCount) {
+	if (currentCmdIndex == 0 && infile) {
+		close(0);
+		int inFd = open(infile, O_RDONLY);
+		dup2(inFd, 0);
+	}
+	if (currentCmdIndex == cmdsCount - 1 && (outfile || appfile)) {
+		close(1);
+		int flags = O_WRONLY | O_CREAT;
+		char* path = outfile;
+		if (appfile) {
+			flags |= O_APPEND;
+			path = appfile;
+		}
+		int outFd = open(path, flags, 0666);
+		dup2(outFd, 1);
+	}
+}
+
 void waitChild(pid_t childIndex) {
-	int status;
-	if (waitpid(childIndex, &status, 0) == -1) {
+	siginfo_t statusInfo;
+	int options = WEXITED | (bkgrnd ? WNOHANG : 0);
+	if (waitid(P_PID, childIndex, &statusInfo, options) == -1) {
 		perror("Error got while waiting for the child");
 		exit(-1);
 	}
-	if (WIFEXITED(status) && WEXITSTATUS(status) != 0 && errno != 0) {
-		perror("");
+	// Понять, должно ли оно работать тут...
+	if (WIFEXITED(statusInfo.si_status) && WEXITSTATUS(statusInfo.si_status) != 0 && errno != 0) {
+		perror("Error in process");
 	}
 }
 
@@ -73,33 +94,18 @@ int main(int argc, char *argv[])
 #endif
 
 		for (i = 0; i < ncmds; i++) {
-			pid_t childIndex = forkWrapper();
-			if (childIndex == 0) {
-				if (i == 0 && infile) {
-					close(0);
-					int inFd = open(infile, O_RDONLY);
-					dup2(inFd, 0);
-				}
-				if (i == ncmds - 1 && (outfile || appfile)) {
-					close(1);
-					int flags = O_WRONLY | O_CREAT;
-					char* path = outfile;
-					if (appfile) {
-						flags |= O_APPEND;
-						path = appfile;
-					}
-					int outFd = open(path, flags, 0666);
-					dup2(outFd, 1);
-				}
+			pid_t childID = forkWrapper();
+			if (childID == 0) {
+				// setpgid(0, 0);
+				checkInputOutputRedirection(i, ncmds);
 				execWrapper(cmds[i].cmdargs);
 			}
 			else {
-				if (!bkgrnd) {
-					waitChild(childIndex);
-					continue;
+				waitChild(childID);
+				if (bkgrnd) {
+					sprintf(buf, "Background process: %d %s\n", childID, cmds[i].cmdargs[0]);
+					write(1, buf, strlen(buf));
 				}
-				sprintf(buf, "Background process: %d %s\n", childIndex, cmds[i].cmdargs[0]);
-				write(1, buf, strlen(buf));
 			}
 		}
 
