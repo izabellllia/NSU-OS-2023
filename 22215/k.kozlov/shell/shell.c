@@ -30,14 +30,19 @@ void execWrapper(char** argv) {
 	}
 }
 
+// Naive places descriptor sourceFd on number from targetFd
+int substituteDescriptor(int sourceFd, int targetFd) {
+	close(targetFd);
+	return dup2(sourceFd, targetFd);
+}
+
+// Checks redirection options and substitutes corresponding std's descriptors
 void setInputOutputRedirection(int currentCmdIndex, int cmdsCount) {
 	if (currentCmdIndex == 0 && infile) {
-		close(0);
 		int inFd = open(infile, O_RDONLY);
-		dup2(inFd, 0);
+		substituteDescriptor(inFd, 0);
 	}
 	if (currentCmdIndex == cmdsCount - 1 && (outfile || appfile)) {
-		close(1);
 		int flags = O_WRONLY | O_CREAT;
 		char* path = outfile;
 		if (appfile) {
@@ -45,31 +50,25 @@ void setInputOutputRedirection(int currentCmdIndex, int cmdsCount) {
 			path = appfile;
 		}
 		int outFd = open(path, flags, 0666);
-		dup2(outFd, 1);
+		substituteDescriptor(outFd, 1);
 	}
 }
 
 int pipesFds[MAXCMDS-1][2];
+
+// Checks pipe's options and substitutes std's descriptors with pipe's in/out
 void setPipes(int cmdIndex, int ncmds) {
-	char buf[1024];
-	int reservedStdOut = dup(1);
-	int tmp;
 	if (cmdIndex < ncmds - 1 && (cmds[cmdIndex].cmdflag & OUTPIP)) {
-		close(1);
-		tmp = dup2(pipesFds[cmdIndex][1], 1);
+		substituteDescriptor(pipesFds[cmdIndex][1], 1);
 		close(pipesFds[cmdIndex][0]);
-		// sprintf(buf, "Set pipe's descriptor %d on stdout of process %d (it's now %d)\n", pipesFds[cmdIndex][1], cmdIndex, tmp);
-		// write(reservedStdOut, buf, strlen(buf));
 	}
 	if (cmdIndex > 0 && (cmds[cmdIndex].cmdflag & INPIP)) {
-		close(0);
-		tmp = dup2(pipesFds[cmdIndex-1][0], 0);
+		substituteDescriptor(pipesFds[cmdIndex-1][0], 0);
 		close(pipesFds[cmdIndex-1][1]);
-		// sprintf(buf, "Set pipe's descriptor %d on stdin of process %d (it's now %d)\n", pipesFds[cmdIndex-1][0], cmdIndex, tmp);
-		// write(reservedStdOut, buf, strlen(buf));
 	}
 }
 
+// Wait child without bkgrnd option
 void waitChild(pid_t childID) {
 	siginfo_t statusInfo;
 	int options = WEXITED | (bkgrnd ? WNOHANG : 0);
@@ -116,24 +115,28 @@ int main(int argc, char *argv[])
 #endif
 
 		for (i = 0; i < ncmds; i++) {
+			// Opens pip for i and i+1 commands
 			if (cmds[i].cmdflag & OUTPIP) {
 				pipe(pipesFds[i]);
-				// sprintf(buf, "Create pipe: %d %d\n", pipesFds[i][0], pipesFds[i][1]);
-				// write(1, buf, strlen(buf));
 			}
+			
 			pid_t childID = forkWrapper();
 			if (childID == 0) {
-				// if (bkgrnd) setpgid(0, 0);
+				// if (bkgrnd) setpgid(0, 0); // First step to jobs
 				setInputOutputRedirection(i, ncmds);
 				setPipes(i, ncmds);
 				execWrapper(cmds[i].cmdargs);
 			}
 			else {
-				if (i > 0) {
+				// Closes pipe for i-1 and i commands
+				if (cmds[i-1].cmdflag & INPIP) {
 					close(pipesFds[i-1][0]);
 					close(pipesFds[i-1][1]);
 				}
+
 				waitChild(childID);
+				
+				// Print message for command ran with &
 				if (bkgrnd) {
 					sprintf(buf, "Background process: %d %s\n", childID, cmds[i].cmdargs[0]);
 					write(1, buf, strlen(buf));
