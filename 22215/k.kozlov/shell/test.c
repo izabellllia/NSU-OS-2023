@@ -1,8 +1,11 @@
-#include <stdio.h>
+#include <unistd.h>
+#include <sys/types.h>
+#include <fcntl.h>
 
 int main() {
-	char str[256] = "";
-	scanf("%s", str);
-	printf("%s", str);
+	int fd = open("output.txt", O_WRONLY | O_CREAT);
+	sleep(5);
+	write(fd, "Printed", 7);
+	close(fd);
 	return 0;
 }
