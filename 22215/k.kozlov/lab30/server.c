@@ -118,7 +118,6 @@ int main(int argc, char** argv) {
     listen(serverSocketDescriptor, 0), 
     "Failed to mark socket as listener"
   );
-
   int clientSocketDescriptor = accept(serverSocketDescriptor, NULL, NULL);
   intPerrorTrigger(clientSocketDescriptor, "Failed to accept request from socket");
   char buf[256] = "";
