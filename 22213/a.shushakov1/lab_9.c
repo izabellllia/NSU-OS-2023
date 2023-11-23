@@ -12,7 +12,7 @@ int main(){
             exit(EXIT_FAILURE);
             break;
         case(0):
-            int ifError = execl("/bin/cat","cat","1.txt",(char *)0);
+            int ifError = execlp("cat","cat","1.txt",(char *)0);
             if(ifError < 0)
                 exit(EXIT_FAILURE);
             break;
