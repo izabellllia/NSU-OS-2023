@@ -1,3 +1,3 @@
 lab16:
-	gcc lab16.c -o lab16 -Wall
+	gcc lab16.c -o lab16 -Wall -Wextra
 
