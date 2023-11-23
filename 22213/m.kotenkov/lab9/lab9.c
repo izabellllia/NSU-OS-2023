@@ -23,7 +23,7 @@ int main() {
             exit(EXIT_SUCCESS);
 
         default:
-            if (waitpid(pid, &child_status, 0) == -1) {
+            if (waitpid(pid, &child_status, WUNTRACED) == -1) {
                 perror("Waitpid failure");
                 exit(EXIT_FAILURE);
             }
