@@ -89,7 +89,7 @@ char bkgrnd;
 
 int main(int argc, char *argv[])
 {
-	register int i;
+	int i;
 	char line[1024];      /*  allow large command lines  */
 	int ncmds;
 	char prompt[50];      /* shell prompt */
