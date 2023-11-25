@@ -210,7 +210,7 @@ char *patternInput() {
         perror("COULD NOT ALLOCATE MEMORY FOR PATTERN\n");
     }
 
-    scanf("%s", pattern_);
+    scanf("%100s", pattern_);
 
     return pattern_;
 }
