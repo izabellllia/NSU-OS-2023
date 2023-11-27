@@ -16,11 +16,9 @@ int main() {
             exit(EXIT_FAILURE);
 
         case (0):
-            if (execlp("cat", "cat", "big_text.txt", (char*) 0) == -1) {
-                perror("Execlp failure");
-                exit(EXIT_FAILURE);
-            }
-            exit(EXIT_SUCCESS);
+            execlp("cat", "cat", "big_text.txt", NULL);
+            perror("Troubles with execlp");
+            exit(EXIT_FAILURE);
 
         default:
             if (waitpid(pid, &child_status, WUNTRACED) == -1) {
