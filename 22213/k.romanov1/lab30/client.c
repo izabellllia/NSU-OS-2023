@@ -23,6 +23,7 @@ int main() {
     strncpy(addr.sun_path, SERVER_NAME, sizeof(addr.sun_path)-1);
 
     if (connect(fileDescriptor, (struct sockaddr*) &addr, sizeof(addr)) == -1) {
+        close(fileDescriptor);
         perror("failed to connect");
         exit(1);
     }
@@ -32,6 +33,7 @@ int main() {
             if (returnValue > 0) {
                 perror("partial write");
             } else {
+                close(fileDescriptor);
                 perror("failed to write");
                 exit(1);
             }

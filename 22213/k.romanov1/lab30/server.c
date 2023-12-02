@@ -14,8 +14,6 @@ int main() {
     int fileDescriptor, clientDescriptor, returnValue;
     struct sockaddr_un addr;
 
-    unlink(SOCKET_NAME);
-
     if ((fileDescriptor = socket(AF_UNIX, SOCK_STREAM, 0)) ==  -1) {
         perror("failed to create socket");
         exit(1);
@@ -25,18 +23,26 @@ int main() {
     addr.sun_family = AF_UNIX;
     strncpy(addr.sun_path, SOCKET_NAME, sizeof(addr.sun_path)-1);
 
+    unlink(SOCKET_NAME);
+
     if (bind(fileDescriptor, (struct sockaddr*) &addr, sizeof(addr))  == -1) {
+        close(fileDescriptor);
+        unlink(SOCKET_NAME);
         perror("failed to bind");
         exit(1);
     }
 
     if (listen(fileDescriptor, 5) == -1) {
+        close(fileDescriptor);
+        unlink(SOCKET_NAME);
         perror("failed to listen");
         exit(1);
     }
 
     while (1) {
         if ((clientDescriptor = accept(fileDescriptor, NULL, NULL)) == -1) {
+            close(fileDescriptor);
+            unlink(SOCKET_NAME);
             perror("failed to accept");
             continue;
         }
@@ -49,6 +55,9 @@ int main() {
         }
 
         if (returnValue == -1) {
+            close(clientDescriptor);
+            close(fileDescriptor);
+            unlink(SOCKET_NAME);
             perror("failed to read");
             exit(1);
         } else if (returnValue == 0) {
