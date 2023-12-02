@@ -1,17 +1,27 @@
-#include <sys/socket.h>
-#include <sys/un.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <sys/socket.h>
+#include <sys/un.h>
 #include <unistd.h>
-#include <strings.h>
+#include <fcntl.h>
+#include <signal.h>
+#include <string.h>
 
 #define SERVER_NAME "server.sock"
 #define BUF_LEN          100
 
+void pipe_sig_handler();
+void int_sig_handler();
+
+int fileDescriptor = -1;
+
 int main() {
     char buf[BUF_LEN];
-    int fileDescriptor, returnValue;
+    int returnValue;
     struct sockaddr_un addr;
+
+    signal(SIGPIPE, pipe_sig_handler);
+    signal(SIGINT, int_sig_handler);
 
     if ((fileDescriptor = socket(AF_UNIX, SOCK_STREAM, 0)) == -1){
         perror("failed to create socket");
@@ -44,3 +54,20 @@ int main() {
     exit(0);
 }
 
+void pipe_sig_handler() {
+    if (fileDescriptor != -1) {
+        close(fileDescriptor);
+        write(2, "\nFailed to write to socket\n", 27);
+    }
+
+    exit(1);
+}
+
+void int_sig_handler() {
+    if (fileDescriptor != -1) {
+        close(fileDescriptor);
+    }
+    write(1, "\nConnection finished\n", 21);
+
+    exit(0);
+}
