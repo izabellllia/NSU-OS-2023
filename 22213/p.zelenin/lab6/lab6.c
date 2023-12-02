@@ -46,11 +46,10 @@ void makeLinesTable(int fd, off_t *count, int *count_n, off_t *buf_n, int* maxLe
 }
 
 int fd;
-char* buf;
-off_t* buf_n; 
 
 void handler() {
-    write(STDIN_FILENO, '\n', 1);
+    char buf[BUF_LEN];
+    write(STDIN_FILENO, "\n", 1);
     if (lseek(fd, 0, SEEK_SET) == -1) {
         perror("lseek() caused an error (handler) ");
         exit(EXIT_FAILURE);
@@ -67,8 +66,6 @@ void handler() {
     }
 
     close(fd);
-    free(buf);
-    free(buf_n);
     exit(EXIT_SUCCESS);
 }
 
@@ -77,8 +74,8 @@ int main(int argc, char* argv[]) {
     off_t count = 0;
     int capacity = BUF_LEN;
     int line;
-    buf = (char*)malloc(sizeof(char) * BUF_LEN);
-    buf_n = (off_t*)calloc(BUF_LEN, sizeof(off_t));
+    char* buf = (char*)malloc(sizeof(char) * BUF_LEN);
+    off_t* buf_n = (off_t*)calloc(BUF_LEN, sizeof(off_t));
 
     if (signal(SIGALRM, handler) == SIG_ERR) {
         perror("signal(2) caused an error ");
