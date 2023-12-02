@@ -50,7 +50,7 @@ char* buf;
 off_t* buf_n; 
 
 void handler() {
-    printf("%c", '\n');
+    write(STDIN_FILENO, '\n', 1);
     if (lseek(fd, 0, SEEK_SET) == -1) {
         perror("lseek() caused an error (handler) ");
         exit(EXIT_FAILURE);
@@ -59,7 +59,7 @@ void handler() {
     ssize_t readBytes;
     while ((readBytes = read(fd, buf, BUF_LEN)) > 0) {
         buf[readBytes] = '\0';
-        printf("%s", buf);
+        write(STDOUT_FILENO, buf, readBytes);
     }
     if (readBytes < 0) {
         perror("read() caused an error (handler)) ");
