@@ -19,10 +19,7 @@ int main(int argc, char* argv[])
           perror("fork error");
           exit(EXIT_FAILURE);
   case 0:
-          if(execvp(argv[1], argv+1) == -1){
-            perror("failed to execute");
-            exit(EXIT_FAILURE);
-          }
+          execvp(argv[1], argv+1);
           perror("Exec error");
           exit(EXIT_FAILURE);
 
