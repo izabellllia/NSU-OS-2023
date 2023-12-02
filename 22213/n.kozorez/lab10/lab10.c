@@ -17,12 +17,15 @@ int main(int argc, char* argv[])
   switch(pid = fork()) {
   case -1:
           perror("fork error");
-          exit(1);
+          exit(EXIT_FAILURE);
   case 0:
           if(execvp(argv[1], argv+1) == -1){
-            perror("exec error");
+            perror("failed to execute");
             exit(EXIT_FAILURE);
           }
+          perror("Exec error");
+          exit(EXIT_FAILURE);
+
   default:
             if (waitpid(pid, &status, 0) == -1) {
                 perror("waitpid error");
