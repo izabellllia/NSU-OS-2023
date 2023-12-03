@@ -12,8 +12,10 @@ int promptline(char *prompt, char *line, int sizline)
 	write(1, prompt, strlen(prompt));
 	while (1) {
 		readCount = read(0, (line + n), sizline-n);
-		if (readCount < 0 && errno == EINTR)
+		if (readCount < 0 && errno == EINTR) {
+			*(line) = '\0';
 			return 1;
+		}
 		n += readCount;
 		*(line+n) = '\0';
 		/*

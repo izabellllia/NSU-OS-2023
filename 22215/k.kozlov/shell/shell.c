@@ -48,7 +48,7 @@ char bkgrnd;
 int main(int argc, char *argv[])
 {
 	pid_t sid = setsid();
-	int terminalDescriptor = open("/dev/tty", O_RDWR);
+	// int terminalDescriptor = open("/dev/tty", O_RDWR);
 	int i;
 	char prevLine[1024];
 	char line[1024];      /*  allow large command lines  */
@@ -183,9 +183,12 @@ void waitChild(pid_t childID) {
 			exit(-1);
 		}
 	}
-	if (statusInfo.si_code == CLD_EXITED && statusInfo.si_status != 0) {
-		sprintf(buf, "Proccess %d exited with code %d\n", childID, statusInfo.si_status);
-		write(2, buf, strlen(buf));
+		// В дальнейшем тут может потребоваться дополнительная логика для прочих изменений состояния потомков
+	if (statusInfo.si_code == CLD_EXITED) {
+		if (statusInfo.si_status != 0) {
+			sprintf(buf, "Proccess %d exited with code %d\n", childID, statusInfo.si_status);
+			write(2, buf, strlen(buf));
+		}
 	}
 }
 
