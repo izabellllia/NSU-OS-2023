@@ -8,6 +8,8 @@
 #define BUF_LEN 20
 #define READBUF_LEN 20
 #define SECONDS 5
+#define LSEEK_ERROR_MESSAGE_LENGTH 34
+#define READ_ERROR_MESSAGE_LENGTH 33
 
 void makeLinesTable(int fd, off_t *count, int *count_n, off_t *buf_n, int* maxLen) {
     int len = 0;
@@ -46,27 +48,27 @@ void makeLinesTable(int fd, off_t *count, int *count_n, off_t *buf_n, int* maxLe
 }
 
 int fd;
+char bufHandler[BUF_LEN];
 
 void handler() {
-    char buf[BUF_LEN];
     write(STDIN_FILENO, "\n", 1);
     if (lseek(fd, 0, SEEK_SET) == -1) {
-        perror("lseek() caused an error (handler) ");
-        exit(EXIT_FAILURE);
+        write(STDERR_FILENO, "lseek() caused an error (handler) ", LSEEK_ERROR_MESSAGE_LENGTH);
+        _exit(EXIT_FAILURE);
     }
 
-    ssize_t readBytes;
-    while ((readBytes = read(fd, buf, BUF_LEN)) > 0) {
-        buf[readBytes] = '\0';
-        write(STDOUT_FILENO, buf, readBytes);
+    sig_atomic_t readBytes;
+    while ((readBytes = read(fd, bufHandler, BUF_LEN)) > 0) {
+        bufHandler[readBytes] = '\0';
+        write(STDOUT_FILENO, bufHandler, readBytes);
     }
     if (readBytes < 0) {
-        perror("read() caused an error (handler)) ");
-        exit(EXIT_FAILURE);
+        write(STDERR_FILENO, "read() caused an error (handler) ", READ_ERROR_MESSAGE_LENGTH);
+        _exit(EXIT_FAILURE);
     }
 
     close(fd);
-    exit(EXIT_SUCCESS);
+    _exit(EXIT_SUCCESS);
 }
 
 int main(int argc, char* argv[]) {
@@ -93,10 +95,9 @@ int main(int argc, char* argv[]) {
     }
 
     if (((fd = open(argv[1], O_RDONLY)) == -1)) {
-        perror("Could not open the file - ");
+        perror("Could not open the file  ");
         exit(EXIT_FAILURE);
     }
-
     makeLinesTable(fd, &count, &count_n, buf_n, &maxLen);
 
     if (capacity < maxLen) {
@@ -109,6 +110,7 @@ int main(int argc, char* argv[]) {
 
     int c;
     while (1) {
+        
         printf("Enter the line number - ");
         alarm(SECONDS);
 
