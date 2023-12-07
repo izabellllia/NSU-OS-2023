@@ -16,7 +16,7 @@ int main() {
     new_term.c_cc[VMIN] = 1;
 
     if (tcsetattr(STDIN_FILENO, TCSAFLUSH, &new_term) == -1) {
-        perror("Tcsetattr failure");
+        perror("Standard input is not a terminal!!! Aborting");
         exit(EXIT_FAILURE);
     }
 
