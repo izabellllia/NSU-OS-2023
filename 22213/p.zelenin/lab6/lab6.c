@@ -11,12 +11,22 @@
 #define LSEEK_ERROR_MESSAGE_LENGTH 34
 #define READ_ERROR_MESSAGE_LENGTH 33
 
-void makeLinesTable(int fd, off_t *count, int *count_n, off_t *buf_n, int* maxLen) {
+int fd;
+char bufHandler[BUF_LEN];
+
+void cleanup(char* buf, off_t* buf_n) {
+    close(fd);
+    free(buf);
+    free(buf_n);
+}
+
+void makeLinesTable(char* buf, off_t *count, int *count_n, off_t *buf_n, int* maxLen) {
     int len = 0;
     buf_n[0] = -1;
     char *readBuffer = (char *) malloc(sizeof(char) * READBUF_LEN);
     if (readBuffer == NULL) {
         perror("Memory allocation error (readBuffer) ");
+        cleanup(buf, buf_n);
         exit(EXIT_FAILURE);
     }
     int capacity_n = BUF_LEN;
@@ -40,15 +50,13 @@ void makeLinesTable(int fd, off_t *count, int *count_n, off_t *buf_n, int* maxLe
     }
     if (readBytes < 0) {
         perror("read() caused an error ");
+        cleanup(buf, buf_n);
         exit(EXIT_FAILURE);
     }
 
     buf_n[++*(count_n)] = *(count);
     free(readBuffer);
 }
-
-int fd;
-char bufHandler[BUF_LEN];
 
 void handler() {
     write(STDIN_FILENO, "\n", 1);
@@ -81,28 +89,33 @@ int main(int argc, char* argv[]) {
 
     if (signal(SIGALRM, handler) == SIG_ERR) {
         perror("signal(2) caused an error ");
+        cleanup(buf, buf_n);
         exit(EXIT_FAILURE);
     }
 
     if (buf == NULL) {
         perror("Memory allocation error (buf) ");
+        cleanup(buf, buf_n);
         exit(EXIT_FAILURE);
     }
 
     if (buf_n == NULL) {
         perror("Memory allocation error (buf_n) ");
+        cleanup(buf, buf_n);
         exit(EXIT_FAILURE);
     }
 
     if (((fd = open(argv[1], O_RDONLY)) == -1)) {
         perror("Could not open the file  ");
+        cleanup(buf, buf_n);
         exit(EXIT_FAILURE);
     }
-    makeLinesTable(fd, &count, &count_n, buf_n, &maxLen);
+    makeLinesTable(buf, &count, &count_n, buf_n, &maxLen);
 
     if (capacity < maxLen) {
         buf = (char* ) realloc(buf, sizeof(char) * (maxLen + 1));
         if (buf == NULL) {
+            cleanup(buf, buf_n);
             perror("realloc() caused an error (buf) ");
             exit(EXIT_FAILURE);
         }
@@ -132,10 +145,12 @@ int main(int argc, char* argv[]) {
         size_t len = buf_n[line] - buf_n[line - 1] - 1;
         if (lseek(fd, buf_n[line - 1] + 1, SEEK_SET) == -1) {
             perror("lseek() caused an error trying to get the line-");
+            cleanup(buf, buf_n);
             exit(EXIT_FAILURE);
         }
         if (read(fd, buf, len) != (ssize_t)len) {
             perror("read() caused an error (line reading)");
+            cleanup(buf, buf_n);
             exit(EXIT_FAILURE);
         }
         buf[len] = '\0';
