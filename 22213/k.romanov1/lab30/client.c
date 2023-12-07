@@ -57,17 +57,17 @@ int main() {
 void pipe_sig_handler() {
     if (fileDescriptor != -1) {
         close(fileDescriptor);
-        write(2, "\nFailed to write to socket\n", 27);
+        write(1, "\nServer was closed\n", 19);
     }
 
-    exit(1);
+    exit(0);
 }
 
 void int_sig_handler() {
     if (fileDescriptor != -1) {
         close(fileDescriptor);
     }
-    write(1, "\nConnection finished\n", 21);
+    write(1, "\nConnection finished\n", 20);
 
     exit(0);
 }

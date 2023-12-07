@@ -32,7 +32,7 @@ int main() {
         exit(1);
     }
 
-    if (listen(fileDescriptor, 5) == -1) {
+    if (listen(fileDescriptor, 1) == -1) {
         close(fileDescriptor);
         unlink(SOCKET_NAME);
         perror("failed to listen");
