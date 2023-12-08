@@ -11,7 +11,6 @@
 #define BUF_LEN          100
 
 void pipe_sig_handler();
-void int_sig_handler();
 
 int fileDescriptor = -1;
 
@@ -21,7 +20,6 @@ int main() {
     struct sockaddr_un addr;
 
     signal(SIGPIPE, pipe_sig_handler);
-    signal(SIGINT, int_sig_handler);
 
     if ((fileDescriptor = socket(AF_UNIX, SOCK_STREAM, 0)) == -1){
         perror("failed to create socket");
@@ -57,17 +55,9 @@ int main() {
 void pipe_sig_handler() {
     if (fileDescriptor != -1) {
         close(fileDescriptor);
-        write(1, "\nServer was closed\n", 19);
+        write(2, "\nServer was closed\n", 19);
     }
 
-    exit(0);
+    exit(1);
 }
 
-void int_sig_handler() {
-    if (fileDescriptor != -1) {
-        close(fileDescriptor);
-    }
-    write(1, "\nConnection finished\n", 20);
-
-    exit(0);
-}
