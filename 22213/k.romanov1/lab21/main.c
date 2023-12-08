@@ -5,7 +5,6 @@
 #include <unistd.h>
 
 int count = 0; 
-int flag = 0;
 
 void sound_handler();
 void quit_handler();
@@ -24,13 +23,7 @@ int main() {
         exit(1);
     }
 
-    while (true) {
-        if (flag)
-        {
-            printf("\nThe beeper worked %d times\n", count);
-            exit(0);
-        }
-    }
+    while (true) {}
 }
 
 void sound_handler() {
@@ -39,5 +32,24 @@ void sound_handler() {
 }
 
 void quit_handler() {
-    flag = 1;
+    if (count < 10) {
+        char toWrite = count  + '0';
+        write(STDOUT_FILENO, &toWrite, sizeof(char));
+        exit(0);
+    }
+    char msg[100];
+    int len = 0;
+
+    while (count != 0) {
+        char buff = (count % 10) + '0';
+        msg[len] = buff;
+        len++;
+        count /= 10;
+    }
+
+    for (int i = len; i >= 0; i--){
+        write(STDOUT_FILENO, &msg[i], sizeof(char));
+    }
+
+    exit(0);
 }
