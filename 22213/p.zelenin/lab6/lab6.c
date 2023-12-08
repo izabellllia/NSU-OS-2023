@@ -157,8 +157,6 @@ int main(int argc, char* argv[]) {
         printf("%s\n", buf);
     }
 
-    free(buf_n);
-    free(buf);
-    close(fd);
+    cleanup(buf, buf_n);
     exit(EXIT_SUCCESS);
 }
