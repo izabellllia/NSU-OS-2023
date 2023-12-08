@@ -1,5 +1,4 @@
 #include <stdio.h>
-<<<<<<< HEAD
 #include <errno.h>
 #include <ucred.h>
 #include <unistd.h>
