@@ -16,3 +16,5 @@ int main()
         printf("%s\n", ctime_r(&now, buf, lenBuf));
         exit(0);
 }
+
+
