@@ -1,4 +1,5 @@
 #include <stdio.h>
+<<<<<<< HEAD
 #include <errno.h>
 #include <ucred.h>
 #include <unistd.h>
@@ -36,4 +37,5 @@ int main (int argc, char *argv[]) {
 
     exit(0);
 }
+
 
