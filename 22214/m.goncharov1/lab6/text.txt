@@ -1,0 +1,10 @@
+Hello, world!
+This is second line.
+And now we can start with C code:
+
+if (a < b) {
+	return 0;
+}
+
+good,
+bye.
