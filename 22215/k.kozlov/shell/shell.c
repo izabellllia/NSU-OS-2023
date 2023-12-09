@@ -10,10 +10,13 @@
 #include <fcntl.h>
 #include <signal.h>
 #include <setjmp.h>
+#include <termios.h>
 
 #include "shell.h"
 
-char buf[1024];
+/*
+	Reference - https://www.gnu.org/software/libc/manual/html_node/Stopped-and-Terminated-Jobs.html
+*/
 
 static pid_t forkWrapper();
 
@@ -41,14 +44,33 @@ static void handleSigInt();
 
 static void setSigIntHandler();
 
+static int execShellSpecificCommand(char* line);
+
 char *infile, *outfile, *appfile;
 struct command cmds[MAXCMDS];
 char bkgrnd;
+char buf[1024];
 
 int main(int argc, char *argv[])
 {
-	pid_t sid = setsid();
-	// int terminalDescriptor = open("/dev/tty", O_RDWR);
+	// Initializing shell in separated group and set it as a foreground group for terminal
+	int terminalDescriptor = STDIN_FILENO;
+	if (!isatty(terminalDescriptor))
+		return 0;
+	// TODO: добавить проверку на то, что шэлл сам не был запущен в фоне
+	pid_t shellPgid = getpid();
+	if (setpgid(shellPgid, shellPgid) < 0) {
+		perror("Cannot create shell's group");
+		return -1;
+	}
+	tcsetpgrp(terminalDescriptor, shellPgid);
+	signal(SIGTSTP, SIG_IGN);
+	signal(SIGCONT, SIG_IGN);
+	signal(SIGTTIN, SIG_IGN);
+	signal(SIGTTOU, SIG_IGN);
+	struct termios defaultTerminalSettings;
+	tcgetattr(terminalDescriptor, &defaultTerminalSettings);
+
 	int i;
 	char prevLine[1024];
 	char line[1024];      /*  allow large command lines  */
@@ -60,40 +82,33 @@ int main(int argc, char *argv[])
 	sprintf(prompt, "[%s] ", getenv("PWD"));
 
 	while (promptline(prompt, line, sizeof(line)) > 0) {    /* until eof */
-		// memcpy(prevLine, line, strlen(line)); // TODO: Заготовка для сохранения прошлых команд
 		if ((ncmds = parseline(line)) <= 0)
 			continue;   /* read next line */
-#ifdef DEBUG
-		{
-			int i, j;
-				for (i = 0; i < ncmds; i++) {
-				for (j = 0; cmds[i].cmdargs[j] != (char *) NULL; j++)
-					fprintf(stderr, "cmd[%d].cmdargs[%d] = %s\n",
-					i, j, cmds[i].cmdargs[j]);
-				fprintf(stderr, "cmds[%d].cmdflag = %o\n", i, cmds[i].cmdflag);
-			}
-		}
-#endif
 		for (i = 0; i < ncmds; i++) {
-			// Opens pip for i and i+1 commands
+			// Opens pipe for i and i+1 commands
 			if (cmds[i].cmdflag & OUTPIP) {
 				pipe(pipesFds[i]);
 			}
 			
 			pid_t childID = forkWrapper();
 			if (childID == 0) {
-				if (bkgrnd) setpgid(0, 0);
 				pid_t pid = getpid();
+				setpgid(pid, pid);
+				signal(SIGTSTP, SIG_DFL);
+				signal(SIGCONT, SIG_DFL);
+				signal(SIGTTIN, SIG_DFL);
+				signal(SIGTTOU, SIG_DFL);
 				sprintf(buf, "Child proccess %d\n", pid);
-				write(1, buf, strlen(buf));
+				write(2, buf, strlen(buf));
 				setInputOutputRedirection(i, ncmds);
 				setPipes(i, ncmds);
 				execWrapper(cmds[i].cmdargs);
 			}
 			else {
+				setpgid(childID, childID); // Необходимо для корректного перехода в новую группу процесса-потомка
 				if (!bkgrnd) {
 					fgGroup = childID;
-					// tcsetpgrp(0, fgGroup); // TODO: Теоретически, должно работать корректно, но надо искать больше инфы про процессы первого плана
+					tcsetpgrp(terminalDescriptor, childID);
 				}
 				// Closes pipe for i-1 and i commands
 				if (i > 0 && cmds[i].cmdflag & INPIP) {
@@ -102,7 +117,10 @@ int main(int argc, char *argv[])
 				}
 
 				waitChild(childID);
-				
+				if (!bkgrnd)
+					tcsetpgrp(terminalDescriptor, shellPgid);
+				sprintf(buf, "Waited %d %s\n", childID, cmds[i].cmdargs[0]);
+				write(2, buf, strlen(buf));
 				// Print message for command ran with &
 				if (bkgrnd) {
 					sprintf(buf, "Background process: %d %s\n", childID, cmds[i].cmdargs[0]);
@@ -110,7 +128,7 @@ int main(int argc, char *argv[])
 				}
 			}
 		}
-
+		// memcpy(prevLine, line, strlen(line)); // TODO: Заготовка для сохранения прошлых команд
 	}  /* close while */
 	return 0;
 }
@@ -173,7 +191,7 @@ void setPipes(int cmdIndex, int ncmds) {
 void waitChild(pid_t childID) {
 	siginfo_t statusInfo;
 	int options = WEXITED | (bkgrnd ? WNOHANG : 0);
-	if (waitid(P_PID, childID, &statusInfo, options) == -1) {
+	if (waitid(P_PGID, childID, &statusInfo, options) == -1) {
 		if (errno == EINTR) {
 			sprintf(buf, "Child process %d was interrupted by signal\n", childID);
 			write(2, buf, strlen(buf));
@@ -192,24 +210,10 @@ void waitChild(pid_t childID) {
 	}
 }
 
-/*
-Как убиваются зомби от фоновых процессов?
-Через настройки jobs-ов
-https://www.gnu.org/software/libc/manual/html_node/Stopped-and-Terminated-Jobs.html
-
-Что такое сигнал?
-Для чего нужны сигналы?
-Что значит "обработать сигнал"?
-Кто кому может посылать сигналы?
-Как посылаются сигналы?
-*/
-
 void handleSigInt() {
 	if (fgGroup > 0) {
 		sigsend(P_PGID, fgGroup, SIGINT);
 	}
-	sprintf(buf, "\nSIGINT handled\n");
-	write(2, buf, strlen(buf));
 }
 
 void setSigIntHandler() {
