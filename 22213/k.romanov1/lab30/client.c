@@ -10,8 +10,6 @@
 #define SERVER_NAME "server.sock"
 #define BUF_LEN          100
 
-void pipe_sig_handler();
-
 int fileDescriptor = -1;
 
 int main() {
@@ -19,7 +17,12 @@ int main() {
     int returnValue;
     struct sockaddr_un addr;
 
-    signal(SIGPIPE, pipe_sig_handler);
+    struct sigaction ign_sigpipe;
+    ign_sigpipe.sa_handler = SIG_IGN;
+    if (sigaction(SIGPIPE, &ign_sigpipe, NULL) == -1) {
+        perror("faield to sigaction ign_sigpipe");
+        exit(1);
+    }
 
     if ((fileDescriptor = socket(AF_UNIX, SOCK_STREAM, 0)) == -1){
         perror("failed to create socket");
@@ -38,26 +41,13 @@ int main() {
 
     while ((returnValue = read(STDIN_FILENO, buf, sizeof(buf))) > 0) {
         if ((write(fileDescriptor, buf, returnValue) != returnValue)) {
-            if (returnValue > 0) {
-                perror("partial write");
-            } else {
-                close(fileDescriptor);
-                perror("failed to write");
-                exit(1);
-            }
+            close(fileDescriptor);
+            perror("Connection was closed");
+            exit(1);
         }
     }
 
     close(fileDescriptor);
     exit(0);
-}
-
-void pipe_sig_handler() {
-    if (fileDescriptor != -1) {
-        close(fileDescriptor);
-        write(2, "\nServer was closed\n", 19);
-    }
-
-    exit(1);
 }
 
