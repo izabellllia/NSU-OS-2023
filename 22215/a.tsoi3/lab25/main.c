@@ -15,7 +15,7 @@ int main(int argc, char* argv[]) {
     }
 
     pid_t pid = fork();
-    if (pid == 0) {   /* Child */
+    if (pid == 0) {    /* Child */
         close(fd[0]);
         char msgout[] = "I wAnT to EAt PiZZa";
         int written_bytes = 0;
@@ -23,19 +23,26 @@ int main(int argc, char* argv[]) {
         do {
             curr_write = write(fd[1], msgout, MSGSIZE);
             if (curr_write == -1) {
-                perror("Error: Child write\n");
+                perror("Error: Child writes\n");
                 return -1;
             }
             written_bytes += curr_write;
         } while (written_bytes < MSGSIZE);
         close(fd[1]);
     }
-    else if (pid > 0) {  /* Parent */
+    else if (pid > 0) {    /* Parent */
         close(fd[1]);
         char msgin[MSGSIZE];
-        if (read(fd[0], msgin, MSGSIZE) == -1) {
-            perror("Error: Parent read\n");
-        }
+        int read_bytes = 0;
+        int curr_read; 
+        do {
+            curr_read = read(fd[0], msgin, MSGSIZE);
+            if (curr_read == -1) {
+                perror("Error: Parent reads\n");
+                return -1;
+            }
+            read_bytes += curr_read;
+        } while (read_bytes < MSGSIZE);
         close(fd[0]);
 
         for (int i = 0; i < MSGSIZE - 1; i++) {
@@ -43,7 +50,7 @@ int main(int argc, char* argv[]) {
         }
         printf("Hears: %s\n", msgin);
     }
-    else {   /* Cannot fork */
+    else {    /* Cannot fork */
         perror("Cannot fork\n");
         return 2;
     }
