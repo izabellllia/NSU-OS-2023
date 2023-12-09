@@ -23,7 +23,7 @@ int main() {
         exit(1);
     }
 
-    while (true) {}
+    while (1) {}
 }
 
 void sound_handler() {
