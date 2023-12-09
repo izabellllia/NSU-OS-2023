@@ -21,7 +21,7 @@ int main(){
                 exit(EXIT_FAILURE);
             break;
         default:
-            ifError0 =  ifError0 = waitpid(pid_1, &child_status, WUNTRACED);
+            ifError0 = waitpid(pid_1, &child_status, WUNTRACED);
             if(ifError0 < 0)
                 exit(EXIT_FAILURE);
             printf("\n\nDone\n");
