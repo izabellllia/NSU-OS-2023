@@ -18,6 +18,11 @@
 	Reference - https://www.gnu.org/software/libc/manual/html_node/Stopped-and-Terminated-Jobs.html
 */
 
+int terminalDescriptor;
+pid_t shellPgid;
+struct termios defaultTerminalSettings;
+static void initShell();
+
 static pid_t forkWrapper();
 
 /*
@@ -50,33 +55,48 @@ char *infile, *outfile, *appfile;
 struct command cmds[MAXCMDS];
 char bkgrnd;
 char buf[1024];
+Job* headJob = NULL;
+
+Job* createNewJob() {
+	Job* newJob = (Job*) malloc(sizeof(Job));
+	newJob->headProcess = NULL;
+	newJob->pgid = 0;
+	newJob->stopped = 0;
+	newJob->next = NULL;
+
+	Job* currentJob = headJob;
+	while (currentJob != NULL) {
+		currentJob = currentJob->next;
+	}
+	currentJob = newJob;
+	return currentJob;
+}
+
+Process* createNewProcessInJob(Job* job) {
+	Process* newProcess = (Process*) malloc(sizeof(Process));
+	// newProcess->cmd = ...; // Пока что буду просто через = копировать в ходе обработки, потом подумаю над выделением памяти
+	newProcess->pid = 0;
+	newProcess->waitStatus = 0;
+	newProcess->next = NULL;
+	Process* currentProcess = job->headProcess;
+	while (currentProcess != NULL) {
+		currentProcess = currentProcess->next;
+	}
+	currentProcess = newProcess;
+	return currentProcess;
+}
 
 int main(int argc, char *argv[])
 {
-	// Initializing shell in separated group and set it as a foreground group for terminal
-	int terminalDescriptor = STDIN_FILENO;
-	if (!isatty(terminalDescriptor))
-		return 0;
-	// TODO: добавить проверку на то, что шэлл сам не был запущен в фоне
-	pid_t shellPgid = getpid();
-	if (setpgid(shellPgid, shellPgid) < 0) {
-		perror("Cannot create shell's group");
-		return -1;
-	}
-	tcsetpgrp(terminalDescriptor, shellPgid);
-	signal(SIGTSTP, SIG_IGN);
-	signal(SIGCONT, SIG_IGN);
-	signal(SIGTTIN, SIG_IGN);
-	signal(SIGTTOU, SIG_IGN);
-	struct termios defaultTerminalSettings;
-	tcgetattr(terminalDescriptor, &defaultTerminalSettings);
 
 	int i;
-	char prevLine[1024];
 	char line[1024];      /*  allow large command lines  */
 	int ncmds;
 	char prompt[50];      /* shell prompt */
+	Job* newJob;
+	Process* newProcess;
 
+	initShell();
 	setSigIntHandler();
 
 	sprintf(prompt, "[%s] ", getenv("PWD"));
@@ -84,16 +104,22 @@ int main(int argc, char *argv[])
 	while (promptline(prompt, line, sizeof(line)) > 0) {    /* until eof */
 		if ((ncmds = parseline(line)) <= 0)
 			continue;   /* read next line */
+		newJob = createNewJob();
 		for (i = 0; i < ncmds; i++) {
+			newProcess = createNewProcessInJob(newJob);
 			// Opens pipe for i and i+1 commands
 			if (cmds[i].cmdflag & OUTPIP) {
 				pipe(pipesFds[i]);
+				// Перенести набор пайпов в джобсы
 			}
 			
 			pid_t childID = forkWrapper();
 			if (childID == 0) {
+				// Вынести в отдельную функцию
 				pid_t pid = getpid();
 				setpgid(pid, pid);
+				// tcsetpgrp(terminalDescriptor, pid); // Если насчёт двойного setpgid были пояснения, то смысл двойного переназначения группы терминала остаётся загадочным
+
 				signal(SIGTSTP, SIG_DFL);
 				signal(SIGCONT, SIG_DFL);
 				signal(SIGTTIN, SIG_DFL);
@@ -105,6 +131,7 @@ int main(int argc, char *argv[])
 				execWrapper(cmds[i].cmdargs);
 			}
 			else {
+				// Вынести в отдельную функции для фоновых и не фоновых процессов
 				setpgid(childID, childID); // Необходимо для корректного перехода в новую группу процесса-потомка
 				if (!bkgrnd) {
 					fgGroup = childID;
@@ -119,8 +146,7 @@ int main(int argc, char *argv[])
 				waitChild(childID);
 				if (!bkgrnd)
 					tcsetpgrp(terminalDescriptor, shellPgid);
-				sprintf(buf, "Waited %d %s\n", childID, cmds[i].cmdargs[0]);
-				write(2, buf, strlen(buf));
+				
 				// Print message for command ran with &
 				if (bkgrnd) {
 					sprintf(buf, "Background process: %d %s\n", childID, cmds[i].cmdargs[0]);
@@ -128,9 +154,29 @@ int main(int argc, char *argv[])
 				}
 			}
 		}
-		// memcpy(prevLine, line, strlen(line)); // TODO: Заготовка для сохранения прошлых команд
 	}  /* close while */
 	return 0;
+}
+
+void initShell() {
+	// Initializing shell in separated group and set it as a foreground group for terminal
+	terminalDescriptor = STDIN_FILENO;
+	if (!isatty(terminalDescriptor)) {
+		perror("Cannot get terminal");
+		exit(-1);
+	}
+	// TODO: добавить проверку на то, что шэлл сам не был запущен в фоне
+	shellPgid = getpid();
+	if (setpgid(shellPgid, shellPgid) < 0) {
+		perror("Cannot create shell's group");
+		exit(-1);
+	}
+	tcsetpgrp(terminalDescriptor, shellPgid);
+	signal(SIGTSTP, SIG_IGN);
+	signal(SIGCONT, SIG_IGN);
+	signal(SIGTTIN, SIG_IGN);
+	signal(SIGTTOU, SIG_IGN);	
+	tcgetattr(terminalDescriptor, &defaultTerminalSettings);
 }
 
 pid_t forkWrapper() {
@@ -190,7 +236,7 @@ void setPipes(int cmdIndex, int ncmds) {
 
 void waitChild(pid_t childID) {
 	siginfo_t statusInfo;
-	int options = WEXITED | (bkgrnd ? WNOHANG : 0);
+	int options = WEXITED | WSTOPPED | (bkgrnd ? WNOHANG : 0);
 	if (waitid(P_PGID, childID, &statusInfo, options) == -1) {
 		if (errno == EINTR) {
 			sprintf(buf, "Child process %d was interrupted by signal\n", childID);
