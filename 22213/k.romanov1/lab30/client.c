@@ -11,6 +11,7 @@
 #define BUF_LEN          100
 
 int fileDescriptor = -1;
+void pipe_sig_handler();
 
 int main() {
     char buf[BUF_LEN];
@@ -18,7 +19,7 @@ int main() {
     struct sockaddr_un addr;
 
     struct sigaction ign_sigpipe;
-    ign_sigpipe.sa_handler = SIG_IGN;
+    ign_sigpipe.sa_handler = pipe_sig_handler;
     if (sigaction(SIGPIPE, &ign_sigpipe, NULL) == -1) {
         perror("faield to sigaction ign_sigpipe");
         exit(1);
@@ -42,7 +43,7 @@ int main() {
     while ((returnValue = read(STDIN_FILENO, buf, sizeof(buf))) > 0) {
         if ((write(fileDescriptor, buf, returnValue) != returnValue)) {
             close(fileDescriptor);
-            perror("Connection was closed");
+            perror("failed to write");
             exit(1);
         }
     }
@@ -51,3 +52,11 @@ int main() {
     exit(0);
 }
 
+void pipe_sig_handler() {
+    if (fileDescriptor != -1) {
+        close(fileDescriptor);
+        write(2, "\nConnection was closed\n", 23);
+    }
+
+    exit(1);
+}
