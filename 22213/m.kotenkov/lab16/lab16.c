@@ -20,22 +20,22 @@ int main() {
         exit(EXIT_FAILURE);
     }
 
-    if ((write(1, "Please say yes\n", 16)) == -1) {
+    if ((write(STDOUT_FILENO, "Please say yes\n", 16)) == -1) {
         perror("Write failure");
         exit(EXIT_FAILURE);
     }
-    if ((read(0, &inp, 1)) == -1) {
+    if ((read(STDIN_FILENO, &inp, 1)) == -1) {
         perror("Read failure");
         exit(EXIT_FAILURE);
     }
 
     if (inp == 'y' || inp == 'Y') {
-        if ((write(1, "\nOh yeah...\n", 13)) == -1) {
+        if ((write(STDOUT_FILENO, "\nOh yeah...\n", 13)) == -1) {
             perror("Write failure");
             exit(EXIT_FAILURE);
         }
     } else {
-        if ((write(STDIN_FILENO, "\nOh no(((\n", 11)) == -1) {
+        if ((write(STDOUT_FILENO, "\nOh no(((\n", 11)) == -1) {
             perror("Write failure");
             exit(EXIT_FAILURE);
         }
