@@ -212,6 +212,7 @@ char *patternInput() {
             if (temp == NULL) {
                 free(pattern_);
                 perror("Memory reallocation error.");
+                exit(EXIT_FAILURE);
             }
             pattern_ = temp;
         }
