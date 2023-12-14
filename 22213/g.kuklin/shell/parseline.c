@@ -30,6 +30,12 @@ int parseline(char *line) {
                     nargs = 0;
                     *s++ = '\0';
                 } else {
+                    if (bkgrnd > 0) {
+                        fprintf(stderr, "Only one \"&\" expected\n");
+                        return -1;
+                    }
+                    ++ncmds;
+                    nargs = 0;
                     ++bkgrnd;
                 }
                 *s++ = '\0';
@@ -46,7 +52,7 @@ int parseline(char *line) {
                 *s++ = '\0';
                 s = blankskip(s);
                 if (!*s) {
-                    fprintf(stderr, "syntax error\n");
+                    fprintf(stderr, "Expected filename after output redirection\n");
                     return(-1);
                 }
 
@@ -58,9 +64,13 @@ int parseline(char *line) {
             case '<':
                 *s++ = '\0';
                 s = blankskip(s);
-                if (!*s || (cmds[ncmds].cmdflag & INPIPE)) {
-                    fprintf(stderr, "syntax error\n");
+                if (!*s) {
+                    fprintf(stderr, "Expected filename after input redirection\n");
                     return(-1);
+                }
+                if (cmds[ncmds].cmdflag & INPIPE) {
+                    fprintf(stderr, "Cannot redirect input into the middle of a pipeline\n");
+                    return -1;
                 }
                 cmds[ncmds].infile = s;
                 cmds[ncmds].cmdflag |= INFILE;
@@ -69,9 +79,13 @@ int parseline(char *line) {
                     *s++ = '\0';
                 break;
             case '|':
-                if (nargs == 0 || (cmds[ncmds].cmdflag & OUTREDIR)) {
-                    fprintf(stderr, "syntax error\n");
+                if (nargs == 0) {
+                    fprintf(stderr, "No command to the left of the pipe\n");
                     return(-1);
+                }
+                if (cmds[ncmds].cmdflag & OUTREDIR) {
+                    fprintf(stderr, "Cannot redirect output from the middle of a pipeline\n");
+                    return -1;
                 }
                 cmds[ncmds++].cmdflag |= OUTPIPE;
                 cmds[ncmds].cmdflag |= INPIPE;
@@ -85,8 +99,13 @@ int parseline(char *line) {
                 break;
             default:
                 /*  a command argument  */
-                if (nargs == 0) /* next command */
-                    rval = ncmds+1;
+                if (nargs == 0) {
+                    rval = ncmds+1; // If this is the first argument - it is a new command
+                    if (bkgrnd > 0) {
+                        fprintf(stderr, "\"&\" is only allowed after the last command\n");
+                        return -1;
+                    }
+                }
 
                 cmds[ncmds].cmdargs[nargs++] = s;
                 cmds[ncmds].cmdargs[nargs] = (char *) NULL;
@@ -112,13 +131,9 @@ int parseline(char *line) {
      */
     if (cmds[ncmds-1].cmdflag & OUTPIPE) {
         if (nargs == 0) {
-            fprintf(stderr, "syntax error\n");
+            fprintf(stderr, "No command to the right of the pipe\n");
             return(-1);
         }
-    }
-
-    if (rval > 1 && bkgrnd) {
-        return -1;
     }
     return(rval);
 }
