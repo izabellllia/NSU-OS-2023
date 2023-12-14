@@ -15,15 +15,15 @@ Job* parseline(char *line)
 {
 	Job* headJob = createNewJob(NULL);
 	Job* newJob = headJob;
+	char *infile = NULL, *outfile = NULL;
+	Command cmds[MAXCMDS];
 	int nargs = 0, ncmds = 0;
 	char *currentLinePtr;
 	char error = 0;
 	static char delim[] = " \t|&<>;\n";
-	char tmpStr[1024] = "";
 
 	/* initialize  */
 	currentLinePtr = line;
-	infile = outfile = appfile = (char *) NULL;
 	cmds[0].cmdargs[0] = (char *) NULL;
 	for (int i = 0; i < MAXCMDS; i++)
 		cmds[i].cmdflag = 0;
@@ -44,9 +44,13 @@ Job* parseline(char *line)
 			continue;
 		}
 		if (*currentLinePtr == '>') {
-			int flags = O_WRONLY | O_CREAT;
+			if (newJob->outPath) {
+				fprintf(stderr, "syntax error\n");
+				error = 1;
+				break;
+			}
 			if (*(currentLinePtr+1) == '>') {
-				flags |= O_APPEND;
+				newJob->appendFlag = 1;
 				*currentLinePtr++ = '\0';
 			}
 			*currentLinePtr++ = '\0';
@@ -59,13 +63,15 @@ Job* parseline(char *line)
 
 			outfile = currentLinePtr;
 			currentLinePtr = strpbrk(currentLinePtr, delim);
-			memcpy(tmpStr, outfile, currentLinePtr - outfile);
-			newJob->outFd = open(tmpStr, flags);
-			if (newJob->outFd < 0) {
-				perror("STDOUT redefining error");
-				error = 1;
-				break;
-			}
+			newJob->outPath = (char*) malloc(currentLinePtr - outfile);
+			memcpy(newJob->outPath, outfile, currentLinePtr - outfile);
+			// newJob->inPath[currentLinePtr - outfile] = '\0';
+			// newJob->outFd = open(tmpStr, flags);
+			// if (newJob->outFd < 0) {
+			// 	perror("STDOUT redefining error");
+			// 	error = 1;
+			// 	break;
+			// }
 			if (isspace(*currentLinePtr))
 				*currentLinePtr++ = '\0';
 			continue;
@@ -73,20 +79,22 @@ Job* parseline(char *line)
 		if (*currentLinePtr == '<') {
 			*currentLinePtr++ = '\0';
 			currentLinePtr = blankskip(currentLinePtr);
-			if (!*currentLinePtr) {
+			if (!*currentLinePtr || newJob->inPath) {
 				fprintf(stderr, "syntax error\n");
 				error = 1;
 				break;
 			}
 			infile = currentLinePtr;
 			currentLinePtr = strpbrk(currentLinePtr, delim);
-			memcpy(tmpStr, infile, currentLinePtr - infile);
-			newJob->inFd = open(tmpStr, O_RDONLY);
-			if (newJob->inFd < 0) {
-				perror("STDIN redefining error");
-				error = 1;
-				break;
-			}
+			newJob->inPath = (char*) malloc(currentLinePtr - infile);
+			memcpy(newJob->inPath, infile, currentLinePtr - infile);
+			// newJob->inPath[currentLinePtr - infile] = '\0';
+			// newJob->inFd = open(tmpStr, O_RDONLY);
+			// if (newJob->inFd < 0) {
+			// 	perror("STDIN redefining error");
+			// 	error = 1;
+			// 	break;
+			// }
 			if (isspace(*currentLinePtr))
 				*currentLinePtr++ = '\0';
 			continue;

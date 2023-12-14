@@ -12,6 +12,9 @@ Job* createNewJob(Job* headJob) {
 	newJob->fg = 1;
 	newJob->inFd = STDIN_FILENO;
 	newJob->outFd = STDOUT_FILENO;
+	newJob->inPath = NULL;
+	newJob->outPath = NULL;
+	newJob->appendFlag = 0;
 	newJob->stopped = 0;
 	
 	if (headJob == NULL)
@@ -52,8 +55,9 @@ Process* createNewProcessInJob(Job* job, Command cmd) {
 
 void writeJobs(Job* headJob) {
 	for (Job* currentJob = headJob; currentJob != NULL; currentJob = currentJob->next) {
-		fprintf(stderr, "Job with group ID %d, IN %d, OUT %d, FG %d:\n", 
-			currentJob->pgid, currentJob->inFd, currentJob->outFd, currentJob->fg);
+		fprintf(stderr, "Job with group ID %d, IN %d(%s), OUT %d(%s%s), FG %d:\n", 
+			currentJob->pgid, currentJob->inFd, currentJob->inPath, 
+			currentJob->outFd, currentJob->appendFlag ? "+ " : "", currentJob->outPath, currentJob->fg);
 		writeProcesses(currentJob);
 	}
 }
@@ -97,6 +101,10 @@ void freeJobs(Job* headJob) {
 		jobForDeletion = currJob;
 		currJob = currJob->next;
 		freeProcesses(jobForDeletion->headProcess);
+		if (jobForDeletion->inPath)
+			free(jobForDeletion->inPath);
+		if (jobForDeletion->outPath)
+			free(jobForDeletion->outPath);
 		free(jobForDeletion);
 	}
 }

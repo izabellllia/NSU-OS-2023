@@ -13,6 +13,7 @@ int promptline(char *prompt, char *line, int sizline)
 	while (1) {
 		readCount = read(0, (line + n), sizline-n);
 		if (readCount < 0 && errno == EINTR) {
+			readInterruptionFlag = 1;
 			*(line) = '\0';
 			return 1;
 		}

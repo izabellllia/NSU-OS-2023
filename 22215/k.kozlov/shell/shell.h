@@ -3,10 +3,16 @@
 #define MAXARGS 256
 #define MAXCMDS 50
 
+extern char readInterruptionFlag;
+
 typedef struct command {
 	char *cmdargs[MAXARGS];
 	char cmdflag;
 } Command;
+
+/*  cmdflag's  */
+#define OUTPIP  01
+#define INPIP   02
 
 typedef struct process
 {
@@ -23,6 +29,9 @@ typedef struct job {
 	char stopped;
 	int inFd;
 	int outFd;
+	char* inPath;
+	char* outPath;
+	char appendFlag;
 	int pipesFds[MAXCMDS-1][2];
 	struct job* next;
 } Job;
@@ -38,16 +47,6 @@ void writeProcesses(Job* job);
 void freeJobs(Job* headJob);
 
 void freeProcesses(Process* headProcess);
-
-
-/*  cmdflag's  */
-#define OUTPIP  01
-#define INPIP   02
-
-extern struct command cmds[];
-extern char *infile, *outfile, *appfile;
-extern char bkgrnd;
-
 
 struct job* parseline(char *);
 int promptline(char *, char *, int);
