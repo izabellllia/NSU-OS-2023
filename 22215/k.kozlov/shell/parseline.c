@@ -1,96 +1,119 @@
 #include <stdio.h>
 #include <ctype.h>
 #include <string.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+
 #include "shell.h"
 
-static char *blankskip(register char *);
+static char *blankskip(char *);
 
-int parseline(char *line)
+Job* parseline(char *line)
 {
-	int nargs, ncmds;
-	register char *s;
-	char aflg = 0;
-	int rval;
-	register int i;
+	Job* headJob = createNewJob(NULL);
+	Job* newJob = headJob;
+	int nargs = 0, ncmds = 0;
+	char *currentLinePtr;
+	char error = 0;
 	static char delim[] = " \t|&<>;\n";
+	char tmpStr[1024] = "";
 
 	/* initialize  */
-	bkgrnd = nargs = ncmds = rval = 0;
-	s = line;
+	currentLinePtr = line;
 	infile = outfile = appfile = (char *) NULL;
 	cmds[0].cmdargs[0] = (char *) NULL;
-	for (i = 0; i < MAXCMDS; i++)
+	for (int i = 0; i < MAXCMDS; i++)
 		cmds[i].cmdflag = 0;
 
-	while (*s) {        /* until line has been parsed */
-		s = blankskip(s);       /*  skip white space */
-		if (!*s) break; /*  done with line */
+	while (*currentLinePtr) {        /* until line has been parsed */
+		currentLinePtr = blankskip(currentLinePtr);       /*  skip white space */
+		if (!*currentLinePtr) break; /*  done with line */
 
 		/*  handle <, >, |, &, and ;  */
-		switch(*s) {
-			case '&':
-				++bkgrnd;
-				*s++ = '\0';
+		if (*currentLinePtr == '&' || *currentLinePtr == ';') {
+			if (*currentLinePtr == '&')
+				newJob->fg = 0;
+			*currentLinePtr++ = '\0';
+			createNewProcessInJob(newJob, cmds[ncmds]);
+			++ncmds;
+			nargs = 0;
+			newJob = createNewJob(newJob);
+			continue;
+		}
+		if (*currentLinePtr == '>') {
+			int flags = O_WRONLY | O_CREAT;
+			if (*(currentLinePtr+1) == '>') {
+				flags |= O_APPEND;
+				*currentLinePtr++ = '\0';
+			}
+			*currentLinePtr++ = '\0';
+			currentLinePtr = blankskip(currentLinePtr);
+			if (!*currentLinePtr) {
+				fprintf(stderr, "syntax error\n");
+				error = 1;
 				break;
-			case '>':
-				if (*(s+1) == '>') {
-					++aflg;
-					*s++ = '\0';
-				}
-				*s++ = '\0';
-				s = blankskip(s);
-				if (!*s) {
-					fprintf(stderr, "syntax error\n");
-					return(-1);
-				}
+			}
 
-				if (aflg)
-					appfile = s;
-				else
-					outfile = s;
-				s = strpbrk(s, delim);
-				if (isspace(*s))
-					*s++ = '\0';
+			outfile = currentLinePtr;
+			currentLinePtr = strpbrk(currentLinePtr, delim);
+			memcpy(tmpStr, outfile, currentLinePtr - outfile);
+			newJob->outFd = open(tmpStr, flags);
+			if (newJob->outFd < 0) {
+				perror("STDOUT redefining error");
+				error = 1;
 				break;
-			case '<':
-				*s++ = '\0';
-				s = blankskip(s);
-				if (!*s) {
-					fprintf(stderr, "syntax error\n");
-					return(-1);
-				}
-				infile = s;
-				s = strpbrk(s, delim);
-				if (isspace(*s))
-					*s++ = '\0';
+			}
+			if (isspace(*currentLinePtr))
+				*currentLinePtr++ = '\0';
+			continue;
+		}
+		if (*currentLinePtr == '<') {
+			*currentLinePtr++ = '\0';
+			currentLinePtr = blankskip(currentLinePtr);
+			if (!*currentLinePtr) {
+				fprintf(stderr, "syntax error\n");
+				error = 1;
 				break;
-			case '|':
-				if (nargs == 0) {
-					fprintf(stderr, "syntax error\n");
-					return(-1);
-				}
-				cmds[ncmds++].cmdflag |= OUTPIP;
-				cmds[ncmds].cmdflag |= INPIP;
-				*s++ = '\0';
-				nargs = 0;
+			}
+			infile = currentLinePtr;
+			currentLinePtr = strpbrk(currentLinePtr, delim);
+			memcpy(tmpStr, infile, currentLinePtr - infile);
+			newJob->inFd = open(tmpStr, O_RDONLY);
+			if (newJob->inFd < 0) {
+				perror("STDIN redefining error");
+				error = 1;
 				break;
-			case ';':
-				*s++ = '\0';
-				++ncmds;
-				nargs = 0;
+			}
+			if (isspace(*currentLinePtr))
+				*currentLinePtr++ = '\0';
+			continue;
+		}
+		if (*currentLinePtr == '|') {
+			if (nargs == 0) {
+				fprintf(stderr, "syntax error\n");
+				error = 1;
 				break;
-			default:
-				/*  a command argument  */
-				if (nargs == 0) /* next command */
-					rval = ncmds+1;
-				cmds[ncmds].cmdargs[nargs++] = s;
-				cmds[ncmds].cmdargs[nargs] = (char *) NULL;
-				s = strpbrk(s, delim);
-				if (isspace(*s))
-					*s++ = '\0';
-				break;
-		}  /*  close switch  */
+			}
+			cmds[ncmds].cmdflag |= OUTPIP;
+			createNewProcessInJob(newJob, cmds[ncmds]);
+			cmds[++ncmds].cmdflag |= INPIP;
+			*currentLinePtr++ = '\0';
+			nargs = 0;
+			continue;
+		}
+		/*  a command argument  */
+		cmds[ncmds].cmdargs[nargs++] = currentLinePtr;
+		cmds[ncmds].cmdargs[nargs] = (char *) NULL;
+		currentLinePtr = strpbrk(currentLinePtr, delim);
+		if (isspace(*currentLinePtr))
+			*currentLinePtr++ = '\0';
 	}  /* close while  */
+	if (nargs > 0 && !error) {
+		createNewProcessInJob(newJob, cmds[ncmds]);
+	}
 
 	/*  error check  */
 
@@ -102,11 +125,26 @@ int parseline(char *line)
 	if (cmds[ncmds-1].cmdflag & OUTPIP) {
 		if (nargs == 0) {
 			fprintf(stderr, "syntax error\n");
-			return(-1);
+			error = 1;
 		}
 	}
 
-	return(rval);
+	newJob = headJob;
+	while (newJob->next) {
+		if (newJob->next->headProcess == NULL) {
+			freeJobs(newJob->next);
+			newJob->next = NULL;
+			break;
+		}
+		newJob = newJob->next;
+	}
+	if (error) {
+		freeJobs(headJob);
+		return NULL;
+	}
+	if (headJob->headProcess == NULL)
+		return NULL;
+	return headJob;
 }
 
 static char * blankskip(register char *s)

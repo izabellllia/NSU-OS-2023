@@ -39,7 +39,7 @@ static void setInputOutputRedirection(int currentCmdIndex, int cmdsCount);
 int pipesFds[MAXCMDS-1][2];
 
 // Checks pipe's options and substitutes std's descriptors with pipe's in/out
-static void setPipes(int cmdIndex, int ncmds);
+static void setPipes(Job* job, int cmdIndex, int ncmds);
 
 // Wait child without bkgrnd option
 static void waitChild(pid_t childID);
@@ -55,45 +55,15 @@ char *infile, *outfile, *appfile;
 struct command cmds[MAXCMDS];
 char bkgrnd;
 char buf[1024];
-Job* headJob = NULL;
-
-Job* createNewJob() {
-	Job* newJob = (Job*) malloc(sizeof(Job));
-	newJob->headProcess = NULL;
-	newJob->pgid = 0;
-	newJob->stopped = 0;
-	newJob->next = NULL;
-
-	Job* currentJob = headJob;
-	while (currentJob != NULL) {
-		currentJob = currentJob->next;
-	}
-	currentJob = newJob;
-	return currentJob;
-}
-
-Process* createNewProcessInJob(Job* job) {
-	Process* newProcess = (Process*) malloc(sizeof(Process));
-	// newProcess->cmd = ...; // Пока что буду просто через = копировать в ходе обработки, потом подумаю над выделением памяти
-	newProcess->pid = 0;
-	newProcess->waitStatus = 0;
-	newProcess->next = NULL;
-	Process* currentProcess = job->headProcess;
-	while (currentProcess != NULL) {
-		currentProcess = currentProcess->next;
-	}
-	currentProcess = newProcess;
-	return currentProcess;
-}
 
 int main(int argc, char *argv[])
 {
-
+	Job* headJob = NULL;
 	int i;
 	char line[1024];      /*  allow large command lines  */
 	int ncmds;
 	char prompt[50];      /* shell prompt */
-	Job* newJob;
+	Job* newJobHead;
 	Process* newProcess;
 
 	initShell();
@@ -102,59 +72,74 @@ int main(int argc, char *argv[])
 	sprintf(prompt, "[%s] ", getenv("PWD"));
 
 	while (promptline(prompt, line, sizeof(line)) > 0) {    /* until eof */
-		if ((ncmds = parseline(line)) <= 0)
+		if ((newJobHead = parseline(line)) == NULL)
 			continue;   /* read next line */
-		newJob = createNewJob();
-		for (i = 0; i < ncmds; i++) {
-			newProcess = createNewProcessInJob(newJob);
-			// Opens pipe for i and i+1 commands
-			if (cmds[i].cmdflag & OUTPIP) {
-				pipe(pipesFds[i]);
-				// Перенести набор пайпов в джобсы
-			}
+		sprintf(buf, "Parsed\n");
+		write(2, buf, strlen(buf));
+		writeJobs(newJobHead);
+		// newJob = createNewJob(newJob);
+		// if (headJob == NULL)
+		// 	headJob = newJob;
+		// newJob->fg = !bkgrnd;
+		// newJob->allProcCnt = ncmds;
+		// for (i = 0; i < ncmds; i++) {
+		// 	newProcess = createNewProcessInJob(newJob, cmds[i]);
+		// 	// Opens pipe for i and i+1 commands
+		// 	if (newProcess->cmd.cmdflag & OUTPIP)
+		// 		pipe(newJob->pipesFds[i]);
 			
-			pid_t childID = forkWrapper();
-			if (childID == 0) {
-				// Вынести в отдельную функцию
-				pid_t pid = getpid();
-				setpgid(pid, pid);
-				// tcsetpgrp(terminalDescriptor, pid); // Если насчёт двойного setpgid были пояснения, то смысл двойного переназначения группы терминала остаётся загадочным
+		// 	pid_t childID = forkWrapper();
+		// 	if (childID == 0) {
+		// 		// Вынести в отдельную функцию
+		// 		childID = getpid();
+		// 		if (newJob->pgid == 0)
+		// 			newJob->pgid = childID;
+		// 		setpgid(childID, newJob->pgid);
+		// 		// tcsetpgrp(terminalDescriptor, pid); // Если насчёт двойного setpgid были пояснения, то смысл двойного переназначения группы терминала остаётся загадочным
 
-				signal(SIGTSTP, SIG_DFL);
-				signal(SIGCONT, SIG_DFL);
-				signal(SIGTTIN, SIG_DFL);
-				signal(SIGTTOU, SIG_DFL);
-				sprintf(buf, "Child proccess %d\n", pid);
-				write(2, buf, strlen(buf));
-				setInputOutputRedirection(i, ncmds);
-				setPipes(i, ncmds);
-				execWrapper(cmds[i].cmdargs);
-			}
-			else {
-				// Вынести в отдельную функции для фоновых и не фоновых процессов
-				setpgid(childID, childID); // Необходимо для корректного перехода в новую группу процесса-потомка
-				if (!bkgrnd) {
-					fgGroup = childID;
-					tcsetpgrp(terminalDescriptor, childID);
-				}
-				// Closes pipe for i-1 and i commands
-				if (i > 0 && cmds[i].cmdflag & INPIP) {
-					close(pipesFds[i-1][0]);
-					close(pipesFds[i-1][1]);
-				}
+		// 		pid_t childPGID = getpgid(0);
 
-				waitChild(childID);
-				if (!bkgrnd)
-					tcsetpgrp(terminalDescriptor, shellPgid);
+		// 		signal(SIGTSTP, SIG_DFL);
+		// 		signal(SIGCONT, SIG_DFL);
+		// 		signal(SIGTTIN, SIG_DFL);
+		// 		signal(SIGTTOU, SIG_DFL);
+		// 		sprintf(buf, "Child proccess %d in group %d\n", childID, childPGID);
+		// 		write(2, buf, strlen(buf));
+		// 		setInputOutputRedirection(i, ncmds);
+		// 		setPipes(newJob, i, ncmds);
+		// 		execWrapper(newProcess->cmd.cmdargs);
+		// 	}
+		// 	else {
+		// 		newProcess->pid = childID;
+		// 		if (newJob->pgid == 0)
+		// 			newJob->pgid = newProcess->pid;
+		// 		// Вынести в отдельную функции для фоновых и не фоновых процессов
+		// 		setpgid(newProcess->pid, newJob->pgid); // Необходимо для корректного перехода в новую группу процесса-потомка
+		// 		if (newJob->fg) {
+		// 			fgGroup = newJob->pgid;
+		// 			tcsetpgrp(terminalDescriptor, newJob->pgid);
+		// 		}
+		// 		// Closes pipe for i-1 and i commands
+		// 		if (i > 0 && newProcess->cmd.cmdflag & INPIP) {
+		// 			close(newJob->pipesFds[i-1][0]);
+		// 			close(newJob->pipesFds[i-1][1]);
+		// 		}
 				
-				// Print message for command ran with &
-				if (bkgrnd) {
-					sprintf(buf, "Background process: %d %s\n", childID, cmds[i].cmdargs[0]);
-					write(2, buf, strlen(buf));
-				}
-			}
-		}
+
+		// 		if (newJob->fg)
+		// 			tcsetpgrp(terminalDescriptor, shellPgid);
+				
+		// 		// Print message for command ran with &
+		// 		if (!newJob->fg) {
+		// 			sprintf(buf, "Background process: %d %s\n", childID, cmds[i].cmdargs[0]);
+		// 			write(2, buf, strlen(buf));
+		// 		}
+		// 	}
+		// }
+		// waitChild(newJob->pgid); // Эту функцию надо сильно переработать
+		// writeJobs(newJob);
 	}  /* close while */
+	// Зарегистрировать функцию для очистки памяти
 	return 0;
 }
 
@@ -179,82 +164,82 @@ void initShell() {
 	tcgetattr(terminalDescriptor, &defaultTerminalSettings);
 }
 
-pid_t forkWrapper() {
-  pid_t child = fork();
-  if (child == -1) {
-    perror("Failed to create child");
-    exit(-1);
-  }
-  return child;
-}
+// pid_t forkWrapper() {
+//   pid_t child = fork();
+//   if (child == -1) {
+//     perror("Failed to create child");
+//     exit(-1);
+//   }
+//   return child;
+// }
 
-void execWrapper(char** argv) {
-	if (execvp(argv[0], argv) == -1) {
-		perror("");
-		exit(-1);
-	}
-}
+// void execWrapper(char** argv) {
+// 	if (execvp(argv[0], argv) == -1) {
+// 		perror("");
+// 		exit(-1);
+// 	}
+// }
 
-int substituteDescriptor(int sourceFd, int targetFd) {
-	close(targetFd);
-	return dup2(sourceFd, targetFd);
-}
+// int substituteDescriptor(int sourceFd, int targetFd) {
+// 	close(targetFd);
+// 	return dup2(sourceFd, targetFd);
+// }
 
-void setInputOutputRedirection(int currentCmdIndex, int cmdsCount) {
-	if (currentCmdIndex == 0 && infile) {
-		int inFd = open(infile, O_RDONLY);
-		substituteDescriptor(inFd, 0);
-	}
-	if (currentCmdIndex == cmdsCount - 1 && (outfile || appfile)) {
-		int flags = O_WRONLY | O_CREAT;
-		char* path = outfile;
-		if (appfile) {
-			flags |= O_APPEND;
-			path = appfile;
-		}
-		int outFd = open(path, flags, 0666);
-		substituteDescriptor(outFd, 1);
-	}
-}
+// void setInputOutputRedirection(int currentCmdIndex, int cmdsCount) {
+// 	if (currentCmdIndex == 0 && infile) {
+// 		int inFd = open(infile, O_RDONLY);
+// 		substituteDescriptor(inFd, 0);
+// 	}
+// 	if (currentCmdIndex == cmdsCount - 1 && (outfile || appfile)) {
+// 		int flags = O_WRONLY | O_CREAT;
+// 		char* path = outfile;
+// 		if (appfile) {
+// 			flags |= O_APPEND;
+// 			path = appfile;
+// 		}
+// 		int outFd = open(path, flags, 0666);
+// 		substituteDescriptor(outFd, 1);
+// 	}
+// }
 
-void setPipes(int cmdIndex, int ncmds) {
-	if (cmdIndex < ncmds - 1 && (cmds[cmdIndex].cmdflag & OUTPIP)) {
-		substituteDescriptor(pipesFds[cmdIndex][1], 1);
-		close(pipesFds[cmdIndex][1]);
-		close(pipesFds[cmdIndex][0]);
-		sprintf(buf, "Proccess %d got pipe %d on stdout\n", cmdIndex, pipesFds[cmdIndex][1]);
-		write(2, buf, strlen(buf));
-	}
-	if (cmdIndex > 0 && (cmds[cmdIndex].cmdflag & INPIP)) {
-		substituteDescriptor(pipesFds[cmdIndex-1][0], 0);
-		close(pipesFds[cmdIndex-1][0]);
-		close(pipesFds[cmdIndex-1][1]);
-		sprintf(buf, "Proccess %d got pipe %d on stdin\n", cmdIndex, pipesFds[cmdIndex-1][0]);
-		write(2, buf, strlen(buf));
-	}
-}
+// void setPipes(Job* job, int cmdIndex, int ncmds) {
+// 	if (cmdIndex < ncmds - 1 && (cmds[cmdIndex].cmdflag & OUTPIP)) {
+// 		substituteDescriptor(job->pipesFds[cmdIndex][1], 1);
+// 		close(job->pipesFds[cmdIndex][1]);
+// 		close(job->pipesFds[cmdIndex][0]);
+// 		// sprintf(buf, "Proccess %d got pipe %d on stdout\n", cmdIndex, job->pipesFds[cmdIndex][1]);
+// 		// write(2, buf, strlen(buf));
+// 	}
+// 	if (cmdIndex > 0 && (cmds[cmdIndex].cmdflag & INPIP)) {
+// 		substituteDescriptor(job->pipesFds[cmdIndex-1][0], 0);
+// 		close(job->pipesFds[cmdIndex-1][0]);
+// 		close(job->pipesFds[cmdIndex-1][1]);
+// 		// sprintf(buf, "Proccess %d got pipe %d on stdin\n", cmdIndex, job->pipesFds[cmdIndex-1][0]);
+// 		// write(2, buf, strlen(buf));
+// 	}
+// }
 
-void waitChild(pid_t childID) {
-	siginfo_t statusInfo;
-	int options = WEXITED | WSTOPPED | (bkgrnd ? WNOHANG : 0);
-	if (waitid(P_PGID, childID, &statusInfo, options) == -1) {
-		if (errno == EINTR) {
-			sprintf(buf, "Child process %d was interrupted by signal\n", childID);
-			write(2, buf, strlen(buf));
-		}
-		else {
-			perror("Error got while waiting for the child");
-			exit(-1);
-		}
-	}
-		// В дальнейшем тут может потребоваться дополнительная логика для прочих изменений состояния потомков
-	if (statusInfo.si_code == CLD_EXITED) {
-		if (statusInfo.si_status != 0) {
-			sprintf(buf, "Proccess %d exited with code %d\n", childID, statusInfo.si_status);
-			write(2, buf, strlen(buf));
-		}
-	}
-}
+// void waitChild(pid_t childID) {
+// 	siginfo_t statusInfo;
+// 	int options = WEXITED | WSTOPPED | (bkgrnd ? WNOHANG : 0);
+// 	if (waitid(P_PGID, childID, &statusInfo, options) == -1) {
+// 		if (errno == EINTR) {
+// 			sprintf(buf, "Child process %d was interrupted by signal\n", childID);
+// 			write(2, buf, strlen(buf));
+// 		}
+// 		else {
+// 			perror("Error got while waiting for the child");
+// 			exit(-1);
+// 		}
+// 	}
+// 		// В дальнейшем тут может потребоваться дополнительная логика для прочих изменений состояния потомков
+// 	if (statusInfo.si_code == CLD_EXITED) {
+// 		if (statusInfo.si_status != 0) {
+// 			sprintf(buf, "Proccess %d exited with code %d\n", childID, statusInfo.si_status);
+// 			write(2, buf, strlen(buf));
+// 		}
+// 	}
+// }
 
 void handleSigInt() {
 	if (fgGroup > 0) {
