@@ -6,6 +6,7 @@
 #include <errno.h>
 
 #define MAX_PATTERN_LENGTH 100
+#define CHUNK_SIZE 10
 
 struct dirent *file;
 regex_t regex;
@@ -22,18 +23,6 @@ enum stringCheckerStatuses {
     STRING_CHECKER_SUCCESS, SLASH_FOUND
 };
 
-int argCheck(int argLength) {
-    if (argLength == 2) {
-        return SUCCESS;
-    }
-
-    if (argLength == 1) {
-        return NO_ARGUMENTS;
-    }
-
-    return TOO_MANY_ARGUMENTS;
-}
-
 int checkString(char *searchString) {
     if (strstr(searchString, "/") != NULL) {
         return SLASH_FOUND;
@@ -42,8 +31,8 @@ int checkString(char *searchString) {
     return STRING_CHECKER_SUCCESS;
 }
 
-void parseLetter(const char *pattern, char *newPattern, int i, int *counter) {
-    if (pattern[i] == '?') {
+void parseLetter(const char *pattern_, char *newPattern, int i, int *counter) {
+    if (pattern_[i] == '?') {
         newPattern[*counter] = '[';
         (*counter)++;
         newPattern[*counter] = 'A';
@@ -69,20 +58,20 @@ void parseLetter(const char *pattern, char *newPattern, int i, int *counter) {
         newPattern[*counter] = ']';
         (*counter)++;
         letterCounter++;
-    } else if (pattern[i] == '*') {
+    } else if (pattern_[i] == '*') {
         newPattern[*counter] = '.';
         (*counter)++;
         newPattern[*counter] = '*';
         (*counter)++;
         asteriskFound++;
-    } else if (pattern[i] == '.') {
+    } else if (pattern_[i] == '.') {
         newPattern[*counter] = '\\';
         (*counter)++;
         newPattern[*counter] = '.';
         (*counter)++;
         letterCounter++;
     } else {
-        newPattern[*counter] = pattern[i];
+        newPattern[*counter] = pattern_[i];
         (*counter)++;
         letterCounter++;
     }
@@ -204,13 +193,31 @@ void propagate(char *rawPattern) {
 
 char *patternInput() {
     printf("Please enter your file pattern\n");
-    char *pattern_ = malloc(sizeof(char) * MAX_PATTERN_LENGTH);
+
+    size_t currentSize = CHUNK_SIZE;
+    size_t usedSize = 0;
+    char *pattern_ = (char *) malloc(currentSize * sizeof(char));
 
     if (pattern_ == NULL) {
-        perror("COULD NOT ALLOCATE MEMORY FOR PATTERN\n");
+        perror("COULD NOT ALLOCATE MEMORY FOR PATTERN");
+        exit(EXIT_FAILURE);
     }
 
-    scanf("%100s", pattern_);
+    printf("Enter pattern: ");
+    int c;
+    while ((c = getchar()) != '\n' && c != EOF) {
+        if (usedSize + 1 >= currentSize) {
+            currentSize += CHUNK_SIZE;
+            char *temp = (char *) realloc(pattern_, currentSize * sizeof(char));
+            if (temp == NULL) {
+                free(pattern_);
+                perror("Memory reallocation error.");
+            }
+            pattern_ = temp;
+        }
+        pattern_[usedSize++] = (char) c;
+    }
+    pattern_[usedSize] = '\0';
 
     return pattern_;
 }
