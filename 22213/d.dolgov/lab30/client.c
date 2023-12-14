@@ -34,12 +34,21 @@ int main() {
         perror("Connection failure");
         exit(EXIT_FAILURE);
     }
-    write(STDOUT_FILENO, "Connected to the server\n", 24);
-
+    printf("Connected to the server\n");
+    // доработать обработку всего подряд, заюзать принтфы
     while (1) {
-        long red = read(STDIN_FILENO, msgout, BUFFER_SIZE);
+        long red;
+        if ((red = read(STDIN_FILENO, msgout, BUFFER_SIZE)) == -1) {
+            perror("Read from buffer error!");
+            exit(EXIT_FAILURE);
+        }
+
         size_t dataLength = red < BUFFER_SIZE ? red : BUFFER_SIZE;
-        write(descriptor, msgout, dataLength);
+
+        if ((write(descriptor, msgout, dataLength)) == -1) {
+            perror("Write to buffer error!");
+            exit(EXIT_FAILURE);
+        }
     }
 }
 

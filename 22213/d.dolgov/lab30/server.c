@@ -18,30 +18,29 @@ int main(int argc, char *argv[]) {
 
     struct sockaddr_un addr;
     memset(&addr, 0, sizeof(addr));
-    addr.sun_family = AF_UNIX; // socket type
-    strcpy(addr.sun_path, SOCKET_NAME); // socket file
+    addr.sun_family = AF_UNIX;
+    strcpy(addr.sun_path, SOCKET_NAME);
     unlink(SOCKET_NAME);
 
     if (bind(descriptor, (struct sockaddr *)&addr, sizeof(addr)) == -1) {
         perror("Binding failure");
         exit(EXIT_FAILURE);
     }
-    write(STDOUT_FILENO, "Socket created\n", 15);
+    printf("Socket created\n");
 
     if (listen(descriptor, 1) == -1) {
         perror("Listening failure");
     }
-    write(STDOUT_FILENO, "Server started listening\n", 25);
+    printf("Server started listening\n");
 
     int accepted;
     if ((accepted = accept(descriptor, NULL, NULL)) == -1) {
         perror("Accept failed");
     }
-    write(STDOUT_FILENO, "Server accepted a connection\n", 29);
+    printf("Server accepted a connection\n");
 
     long actuallyReadBytes;
     char buffer[BUFFER_SIZE];
-    memset(buffer, '\0', BUFFER_SIZE);
     while ((actuallyReadBytes = read(accepted, buffer, BUFFER_SIZE)) > 0) {
         for (int i = 0; i < actuallyReadBytes; i++) {
             buffer[i] = (char) toupper(buffer[i]);
@@ -57,7 +56,7 @@ int main(int argc, char *argv[]) {
         perror("Read failure");
         exit(EXIT_FAILURE);
     }
-    write(STDOUT_FILENO, "Server finished its' work\n", 26);
+    printf("Server finished its' work\n");
 
     close(accepted);
     close(descriptor);
