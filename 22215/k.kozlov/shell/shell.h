@@ -20,6 +20,7 @@ typedef struct process
 	Command cmd;
 	pid_t pid;
 	siginfo_t statusInfo;
+	struct process* prev;
 	struct process* next;
 } Process;
 
@@ -27,6 +28,7 @@ typedef struct job {
 	Process* headProcess;
 	pid_t pgid;
 	char fg;
+	int bgNumber;
 	char stopped;
 	int inFd;
 	int outFd;
@@ -34,12 +36,16 @@ typedef struct job {
 	char* outPath;
 	char appendFlag;
 	int pipesFds[MAXCMDS-1][2];
+	struct job* prev;
 	struct job* next;
 } Job;
 
 Job* createNewJob(Job* headJob);
 
 Process* createNewProcessInJob(Job* job, Command cmd);
+
+void extractJobFromList(Job* job);
+Job* getJobByBgNumber(Job* headJob, int bgNumber);
 
 Process* getProcessByPid(Job* job, pid_t pid);
 

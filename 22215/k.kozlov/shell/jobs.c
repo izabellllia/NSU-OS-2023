@@ -12,12 +12,15 @@ Job* createNewJob(Job* headJob) {
 	newJob->headProcess = NULL;
 	newJob->pgid = 0;
 	newJob->fg = 1;
+	newJob->bgNumber = 0;
 	newJob->inFd = STDIN_FILENO;
 	newJob->outFd = STDOUT_FILENO;
 	newJob->inPath = NULL;
 	newJob->outPath = NULL;
 	newJob->appendFlag = 0;
 	newJob->stopped = 0;
+	newJob->prev = NULL;
+	newJob->next = NULL;
 	
 	if (headJob == NULL)
 		return newJob;
@@ -27,6 +30,7 @@ Job* createNewJob(Job* headJob) {
 	}
 
 	currentJob->next = newJob;
+	newJob->prev = currentJob;
 	return newJob;
 }
 
@@ -42,6 +46,7 @@ Process* createNewProcessInJob(Job* job, Command cmd) {
 	newProcess->pid = 0;
 	newProcess->statusInfo.si_code = 0;
 	newProcess->statusInfo.si_status = 0;
+	newProcess->prev = NULL;	
 	newProcess->next = NULL;	
 
 	if (job->headProcess == NULL) {
@@ -53,7 +58,27 @@ Process* createNewProcessInJob(Job* job, Command cmd) {
 		currentProcess = currentProcess->next;
 	}
 	currentProcess->next = newProcess;
+	newProcess->prev = currentProcess;
 	return newProcess;
+}
+
+void extractJobFromList(Job* job) {
+	Job* prevJob = job->prev;
+	Job* nextJob = job->next;
+	job->prev = NULL;
+	job->next = NULL;
+	if (prevJob)
+		prevJob->next = nextJob;
+	if (nextJob)
+		nextJob->prev = prevJob;
+}
+
+Job* getJobByBgNumber(Job* headJob, int bgNumber) {
+	for (Job* currentJob = headJob; currentJob != NULL; currentJob = currentJob->next) {
+		if (currentJob->bgNumber == bgNumber)
+			return currentJob;
+	}
+	return NULL;
 }
 
 Process* getProcessByPid(Job* job, pid_t pid) {
