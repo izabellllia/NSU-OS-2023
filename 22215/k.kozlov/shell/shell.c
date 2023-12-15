@@ -9,7 +9,6 @@
 #include <sys/wait.h>
 #include <fcntl.h>
 #include <signal.h>
-#include <setjmp.h>
 #include <termios.h>
 
 #include "shell.h"
@@ -32,7 +31,7 @@ static int substituteDescriptor(int sourceFd, int targetFd);
 
 static void setInputOutputRedirection(Job* job, Process* process, int* prevPipes, int* newPipes);
 
-static void waitChild(pid_t childID);
+static void waitFgJob(Job* job);
 
 Job* fgJob;
 char readInterruptionFlag = 0;
@@ -65,13 +64,13 @@ int main(int argc, char *argv[])
 		}
 		if ((newJobsHead = parseline(line)) == NULL)
 			continue;
-		writeJobs(newJobsHead);
+		// printJobs(newJobsHead);
 		currentJob = newJobsHead;
 		while (currentJob != NULL) {
 			processJob(currentJob);
 			currentJob = currentJob->next;
 		}
-		writeJobs(newJobsHead);
+		printJobs(newJobsHead);
 	}
 	fprintf(stderr, "Bye!\n");
 	// Зарегистрировать функцию для очистки памяти
@@ -128,7 +127,7 @@ int processJob(Job* job) {
 			signal(SIGCONT, SIG_DFL);
 			signal(SIGTTIN, SIG_DFL);
 			signal(SIGTTOU, SIG_DFL);
-			fprintf(stderr, "Child proccess %d in group %d\n", childId, childPgid);
+			// fprintf(stderr, "Child proccess %d in group %d\n", childId, childPgid);
 
 			setInputOutputRedirection(job, currentProcess, prevPipes, newPipes);
 
@@ -160,7 +159,7 @@ int processJob(Job* job) {
 		currentProcess = currentProcess->next;
 	}
 	if (job->fg) {
-		waitChild(job->pgid);
+		waitFgJob(job);
 		tcsetpgrp(terminalDescriptor, shellPgid);
 		// To be continued...
 	}
@@ -215,24 +214,25 @@ void setInputOutputRedirection(Job* job, Process* process, int* prevPipes, int* 
 	close(prevPipes[1]);
 }
 
-void waitChild(pid_t childID) {
+void waitFgJob(Job* job) {
 	siginfo_t statusInfo;
 	// int options = WEXITED | WSTOPPED | (bkgrnd ? WNOHANG : 0);
 	int options = WEXITED | WSTOPPED;
-	if (waitid(P_PGID, childID, &statusInfo, options) == -1) {
+	while (!isAllProcessesTerminated(job)) {
+		if (waitid(P_PGID, job->pgid, &statusInfo, options) == -1) {
 		if (errno == EINTR) {
-			fprintf(stderr, "Child process %d was interrupted by signal\n", childID);
+			fprintf(stderr, "Child process %d was interrupted by signal\n", job->pgid);
 		}
 		else {
 			perror("Error got while waiting for the child");
 			exit(-1);
 		}
 	}
-		// В дальнейшем тут может потребоваться дополнительная логика для прочих изменений состояния потомков
-	if (statusInfo.si_code == CLD_EXITED) {
-		if (statusInfo.si_status != 0) {
-			fprintf(stderr, "Proccess %d exited with code %d\n", childID, statusInfo.si_status);
-		}
+	Process* p = getProcessByPid(job, statusInfo.si_pid);
+	p->statusInfo = statusInfo;
+	fprintf(stderr, "Waited process from job %d:\n", job->pgid);
+	printProcess(p);
+	// В дальнейшем тут может потребоваться дополнительная логика для прочих изменений состояния потомков
 	}
 }
 

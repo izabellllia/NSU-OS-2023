@@ -2,6 +2,8 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
+#include <wait.h>
+#include <sys/wait.h>
 
 #include "shell.h"
 
@@ -38,7 +40,8 @@ Process* createNewProcessInJob(Job* job, Command cmd) {
 		cmdArgIndex++;
 	}
 	newProcess->pid = 0;
-	newProcess->waitStatus = 0;
+	newProcess->statusInfo.si_code = 0;
+	newProcess->statusInfo.si_status = 0;
 	newProcess->next = NULL;	
 
 	if (job->headProcess == NULL) {
@@ -53,27 +56,60 @@ Process* createNewProcessInJob(Job* job, Command cmd) {
 	return newProcess;
 }
 
-void writeJobs(Job* headJob) {
+Process* getProcessByPid(Job* job, pid_t pid) {
+	Process* currentProcess = job->headProcess;
+	while (currentProcess != NULL) {
+		if (currentProcess->pid == pid)
+			return currentProcess;
+		currentProcess = currentProcess->next;
+	}
+	return NULL;
+}
+
+int isAllProcessesTerminated(Job* job) {
+	Process* currentProcess = job->headProcess;
+	while (currentProcess != NULL) {
+		if (currentProcess->statusInfo.si_code == 0)
+			return 0;
+		currentProcess = currentProcess->next;
+	}
+	return 1;
+}
+
+void printJobs(Job* headJob) {
 	for (Job* currentJob = headJob; currentJob != NULL; currentJob = currentJob->next) {
-		fprintf(stderr, "Job with group ID %d, IN %d(%s), OUT %d(%s%s), FG %d:\n", 
-			currentJob->pgid, currentJob->inFd, currentJob->inPath, 
-			currentJob->outFd, currentJob->appendFlag ? "+ " : "", currentJob->outPath, currentJob->fg);
-		writeProcesses(currentJob);
+		printJob(currentJob);
+		printProcesses(currentJob);
 	}
 }
 
-void writeProcesses(Job* job) {
+void printJob(Job* job) {
+	fprintf(stderr, "Job with group ID %d, IN = %s, OUT = %s%s, FG %d:\n", 
+		job->pgid, 
+		job->inPath ? job->inPath : "STDIN", 
+		job->appendFlag ? "+ " : "", 
+		job->outPath ? job->outPath : "STDOUT",
+		job->fg
+	);
+}
+
+void printProcesses(Job* job) {
 	Process* currentProcess = job->headProcess;
 	while (currentProcess != NULL) {
-		fprintf(stderr, "\tProcess %d, PIPES %d\n", currentProcess->pid, currentProcess->cmd.cmdflag);
-		int argIndex = 0;
-		while (currentProcess->cmd.cmdargs[argIndex])
-		{
-			fprintf(stderr, "\t\tArg %d: %s\n", argIndex, currentProcess->cmd.cmdargs[argIndex]);
-			++argIndex;
-		}
-		
+		printProcess(currentProcess);
 		currentProcess = currentProcess->next;
+	}
+}
+
+void printProcess(Process* process) {
+	fprintf(stderr, "\tProcess %d, PIPES %d\n", process->pid, process->cmd.cmdflag);
+	fprintf(stderr, "\tCode %d\n\tStatus %d\n", 
+		process->statusInfo.si_code, process->statusInfo.si_status);
+	int argIndex = 0;
+	while (process->cmd.cmdargs[argIndex])
+	{
+		fprintf(stderr, "\t\tArg %d: %s\n", argIndex, process->cmd.cmdargs[argIndex]);
+		++argIndex;
 	}
 }
 

@@ -1,4 +1,5 @@
 #include <unistd.h>
+#include <sys/wait.h>
 
 #define MAXARGS 256
 #define MAXCMDS 50
@@ -18,7 +19,7 @@ typedef struct process
 {
 	Command cmd;
 	pid_t pid;
-	int waitStatus;
+	siginfo_t statusInfo;
 	struct process* next;
 } Process;
 
@@ -40,9 +41,15 @@ Job* createNewJob(Job* headJob);
 
 Process* createNewProcessInJob(Job* job, Command cmd);
 
-void writeJobs(Job* headJob);
+Process* getProcessByPid(Job* job, pid_t pid);
 
-void writeProcesses(Job* job);
+int isAllProcessesTerminated(Job* job);
+
+void printJobs(Job* headJob);
+void printJob(Job* job);
+
+void printProcesses(Job* job);
+void printProcess(Process* process);
 
 void freeJobs(Job* headJob);
 
