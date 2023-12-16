@@ -35,7 +35,7 @@ Job* parseline(char *line)
 		/*  handle <, >, |, &, and ;  */
 		if (*currentLinePtr == '&' || *currentLinePtr == ';') {
 			if (*currentLinePtr == '&')
-				newJob->fg = 0;
+				newJob->initialFg = 0;
 			*currentLinePtr++ = '\0';
 			createNewProcessInJob(newJob, cmds[ncmds]);
 			++ncmds;

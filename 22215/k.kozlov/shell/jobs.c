@@ -11,7 +11,7 @@ Job* createNewJob(Job* headJob) {
 	Job* newJob = (Job*) malloc(sizeof(Job));
 	newJob->headProcess = NULL;
 	newJob->pgid = 0;
-	newJob->fg = 1;
+	newJob->initialFg = 1;
 	newJob->bgNumber = 0;
 	newJob->inFd = STDIN_FILENO;
 	newJob->outFd = STDOUT_FILENO;
@@ -94,7 +94,8 @@ Process* getProcessByPid(Job* job, pid_t pid) {
 int isAllProcessesTerminated(Job* job) {
 	Process* currentProcess = job->headProcess;
 	while (currentProcess != NULL) {
-		if (currentProcess->statusInfo.si_code == 0)
+		if (currentProcess->statusInfo.si_code != CLD_EXITED 
+			&& currentProcess->statusInfo.si_code != CLD_KILLED)
 			return 0;
 		currentProcess = currentProcess->next;
 	}
@@ -109,12 +110,13 @@ void printJobs(Job* headJob) {
 }
 
 void printJob(Job* job) {
-	fprintf(stderr, "Job with group ID %d, IN = %s, OUT = %s%s, FG %d:\n", 
+	if (job->bgNumber)
+		fprintf(stderr, "BG(%d) ", job->bgNumber); 
+	fprintf(stderr, "Job with group ID %d, IN = %s, OUT = %s%s:\n", 
 		job->pgid, 
 		job->inPath ? job->inPath : "STDIN", 
 		job->appendFlag ? "+ " : "", 
-		job->outPath ? job->outPath : "STDOUT",
-		job->fg
+		job->outPath ? job->outPath : "STDOUT"
 	);
 }
 

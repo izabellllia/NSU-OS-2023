@@ -13,8 +13,13 @@
 #include <fcntl.h>
 #include <signal.h>
 #include <termios.h>
+#include <time.h>
 
 int main() {
-	fprintf(stdout, "%d", SIGTTIN);
+	struct timespec delay;
+	delay.tv_sec = 5;
+	delay.tv_nsec = 1000000000;
+	sleep(10);
+	fprintf(stdout, "Time is out\n");
 	return 0;
 }

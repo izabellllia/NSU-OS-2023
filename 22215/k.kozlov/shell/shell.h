@@ -27,7 +27,7 @@ typedef struct process
 typedef struct job {
 	Process* headProcess;
 	pid_t pgid;
-	char fg;
+	char initialFg;
 	int bgNumber;
 	char stopped;
 	int inFd;
