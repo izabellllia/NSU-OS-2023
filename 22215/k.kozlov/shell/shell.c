@@ -12,6 +12,9 @@
 #include <termios.h>
 
 #include "shell.h"
+#include "shell_structs.h"
+#include "jobs.h"
+#include "shell_cmds.h"
 
 /*
 	Reference - https://www.gnu.org/software/libc/manual/html_node/Stopped-and-Terminated-Jobs.html
@@ -32,8 +35,6 @@ static int substituteDescriptor(int sourceFd, int targetFd);
 
 static void setInputOutputRedirection(Job* job, Process* process, int* prevPipes, int* newPipes);
 
-static void waitFgJob(Job* job);
-
 int bgFreeNumber = 1;
 Job* headBgJobFake = NULL;
 Job* lastBgJob;
@@ -43,18 +44,8 @@ char readInterruptionFlag = 0;
 static void handleSigInt();
 static void setSigIntHandler();
 
-static int processShellSpecificForkedCommand(Process* process);
-static void jobs_cmd();
-
-// Only one process in job!
-static int processShellSpecificMainCommand(Job* job);
-static int parseFromIntFromPercentArg(char* arg);
-static void fg_cmd(char* argNum);
-static void bg_cmd(char* argNum);
-static void kill_cmd(char* argNum);
-static void cd_cmd(char* path);
-
 char prompt[1024];
+
 int main(int argc, char *argv[])
 {
 	char line[1024];      /*  allow large command lines  */
@@ -63,7 +54,6 @@ int main(int argc, char *argv[])
 	Job* nextJob;
 
 	initShell();
-	setSigIntHandler();
 
 	while (promptline(updatePrompt(), line, sizeof(line)) > 0) {
 		if (readInterruptionFlag) {
@@ -78,11 +68,11 @@ int main(int argc, char *argv[])
 			currentJob = nextJob;
 			nextJob = nextJob->next;
 			extractJobFromList(currentJob);
+			refineJobsStatuses(headBgJobFake->next);
 			if (!processShellSpecificMainCommand(currentJob))
 				continue;
 			processJob(currentJob);
 			// TODO: Опрашивать фоновые jobs'ы и выводить их статусы (возможно только неизменные)
-			printJobs(headBgJobFake->next);
 		}
 	}
 	fprintf(stderr, "Bye!\n");
@@ -111,13 +101,12 @@ void initShell() {
 		exit(-1);
 	}
 	tcsetpgrp(terminalDescriptor, shellPgid);
-	// signal(SIGINT, SIG_IGN);
 	signal(SIGTSTP, SIG_IGN);
 	signal(SIGCONT, SIG_IGN);
 	signal(SIGTTIN, SIG_IGN);
 	signal(SIGTTOU, SIG_IGN);	
+	setSigIntHandler();
 	tcgetattr(terminalDescriptor, &defaultTerminalSettings);
-
 	headBgJobFake = createNewJob(headBgJobFake);
 	lastBgJob = headBgJobFake;
 }
@@ -144,14 +133,11 @@ int processJob(Job* job) {
 			if (job->initialFg)
 				tcsetpgrp(terminalDescriptor, job->pgid);
 
-			pid_t childPgid = getpgid(0);
-
-			// signal(SIGINT, SIG_DFL);
+			signal(SIGINT, SIG_DFL);
 			signal(SIGTSTP, SIG_DFL);
 			signal(SIGCONT, SIG_DFL);
 			signal(SIGTTIN, SIG_DFL);
 			signal(SIGTTOU, SIG_DFL);
-			// fprintf(stderr, "Child proccess %d in group %d\n", childId, childPgid);
 
 			setInputOutputRedirection(job, currentProcess, prevPipes, newPipes);
 
@@ -178,49 +164,14 @@ int processJob(Job* job) {
 		tcsetpgrp(terminalDescriptor, job->pgid);
 		waitFgJob(job);
 		tcsetpgrp(terminalDescriptor, shellPgid);
+		tcsetattr(terminalDescriptor, TCSAFLUSH, &defaultTerminalSettings);
 	}
 	else {
 		int bgNumber = addJobToBg(job);
 		fprintf(stderr, "Background job %d:\n", bgNumber);
 		printJobs(job);
-		// To be continued...
 	}
 	return 0;
-}
-
-int processShellSpecificMainCommand(Job* job) {
-	Process* process = job->headProcess;
-	if (process->next || !process->cmd.cmdargs[1]) {
-		return -1;
-	}
-	if (process->cmd.cmdargs[1][0] == '%') {
-		if (strcmp(process->cmd.cmdargs[0], "fg") == 0) {
-			fg_cmd(process->cmd.cmdargs[1]);
-			return 0;
-		}
-		if (strcmp(process->cmd.cmdargs[0], "bg") == 0) {
-			bg_cmd(process->cmd.cmdargs[1]);
-			return 0;
-		}
-		if (strcmp(process->cmd.cmdargs[0], "kill") == 0) {
-			kill_cmd(process->cmd.cmdargs[1]);
-			return 0;
-		}
-	}
-	if (strcmp(process->cmd.cmdargs[0], "cd") == 0) {
-		cd_cmd(process->cmd.cmdargs[1]);
-		return 0;
-	}
-	return -1;
-}
-
-int processShellSpecificForkedCommand(Process* process) {
-	if (strcmp(process->cmd.cmdargs[0], "jobs") == 0) {
-		jobs_cmd();
-		return 0;
-	}
-	else 
-		return -1;
 }
 
 int substituteDescriptor(int sourceFd, int targetFd) {
@@ -270,7 +221,7 @@ void waitFgJob(Job* job) {
 	while (!isAllProcessesTerminated(job)) {
 		if (waitid(P_PGID, job->pgid, &statusInfo, options) == -1) {
 			if (errno == EINTR) {
-				fprintf(stderr, "Child process %d was interrupted by signal\n", job->pgid);
+				fprintf(stderr, "Wait was interrupted by signal\n");
 			}
 			else {
 				perror("Error got while waiting for the child");
@@ -291,6 +242,11 @@ void waitFgJob(Job* job) {
 			fprintf(stderr, "Job stopped\n");
 			extractJobFromList(job); // In fact, unnecessary but more safe
 			addJobToBg(job);
+			printJobs(job);
+			break;
+		}
+		if (p->statusInfo.si_code == CLD_CONTINUED) {
+			fprintf(stderr, "Job continued\n");
 			printJobs(job);
 			break;
 		}
@@ -325,62 +281,4 @@ void setSigIntHandler() {
 	sigIntAction.sa_mask = set;
 	// sigIntAction.sa_flags = SA_RESTART;
 	sigaction(SIGINT, &sigIntAction, NULL);
-}
-
-// TODO: Реализовать более человеческий метод вывода
-void jobs_cmd() {
-	// TODO: Вызывать опросник
-	printJobs(headBgJobFake->next);
-}
-
-static int parseFromIntFromPercentArg(char* arg) {
-	int num;
-	sscanf(arg+1, "%d", &num);
-	return num;
-}
-
-void fg_cmd(char* argNum) {
-	int bgNumber = parseFromIntFromPercentArg(argNum);
-	Job* bgJob = getJobByBgNumber(headBgJobFake, bgNumber);
-	if (!bgJob)	{
-		fprintf(stderr, "Background job %d wasn't found\n", bgNumber);
-		return;
-	}
-	if (lastBgJob == bgJob)
-		lastBgJob = bgJob->prev;
-	extractJobFromList(bgJob);
-	tcsetpgrp(terminalDescriptor, bgJob->pgid);
-	sigsend(P_PGID, bgJob->pgid, SIGCONT);
-	waitFgJob(bgJob);
-	tcsetpgrp(terminalDescriptor, shellPgid);
-}
-
-void bg_cmd(char* argNum) {
-	int bgNumber = parseFromIntFromPercentArg(argNum);
-	Job* bgJob = getJobByBgNumber(headBgJobFake, bgNumber);
-	if (!bgJob)	{
-		fprintf(stderr, "Background job %d wasn't found\n", bgNumber);
-		return;
-	}
-	sigsend(P_PGID, bgJob->pgid, SIGCONT);
-}
-
-void kill_cmd(char* argNum) {
-	int bgNumber = parseFromIntFromPercentArg(argNum);
-	Job* bgJob = getJobByBgNumber(headBgJobFake, bgNumber);
-	if (!bgJob)	{
-		fprintf(stderr, "Background job %d wasn't found\n", bgNumber);
-		return;
-	}
-	sigsend(P_PGID, bgJob->pgid, SIGKILL);
-}
-
-void cd_cmd(char* path) {
-	if (strcmp(path, "~") == 0) {
-		path = getenv("HOME");
-	}
-	if (chdir(path) != 0) {
-		perror("Failed to changed directory");
-		return;
-	}
 }

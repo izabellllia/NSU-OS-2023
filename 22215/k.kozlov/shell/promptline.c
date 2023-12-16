@@ -2,6 +2,7 @@
 #include <unistd.h>
 #include <string.h>
 #include <errno.h>
+
 #include "shell.h"
 
 int promptline(char *prompt, char *line, int sizline)

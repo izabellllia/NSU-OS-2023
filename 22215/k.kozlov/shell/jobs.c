@@ -5,7 +5,8 @@
 #include <wait.h>
 #include <sys/wait.h>
 
-#include "shell.h"
+#include "shell_structs.h"
+#include "jobs.h"
 
 Job* createNewJob(Job* headJob) {
 	Job* newJob = (Job*) malloc(sizeof(Job));
@@ -18,7 +19,7 @@ Job* createNewJob(Job* headJob) {
 	newJob->inPath = NULL;
 	newJob->outPath = NULL;
 	newJob->appendFlag = 0;
-	newJob->stopped = 0;
+	newJob->status = J_SETTING;
 	newJob->prev = NULL;
 	newJob->next = NULL;
 	
@@ -74,11 +75,33 @@ void extractJobFromList(Job* job) {
 }
 
 Job* getJobByBgNumber(Job* headJob, int bgNumber) {
-	for (Job* currentJob = headJob; currentJob != NULL; currentJob = currentJob->next) {
-		if (currentJob->bgNumber == bgNumber)
-			return currentJob;
+	for (Job* job = headJob; job != NULL; job = job->next) {
+		if (job->bgNumber == bgNumber)
+			return job;
 	}
 	return NULL;
+}
+
+void refineJobStatus(Job* job) {
+	siginfo_t newStatusInfo;
+	int options = WEXITED | WSTOPPED | WCONTINUED | WNOHANG;
+	while (!isAllProcessesTerminated(job)) {
+		if (waitid(P_PGID, job->pgid, &newStatusInfo, options) != 0) {
+			perror("Error in bg jobs refining");
+			break;
+		}
+		if (newStatusInfo.si_pid == 0)
+			break;
+		Process* p = getProcessByPid(job, newStatusInfo.si_pid);
+		p->statusInfo = newStatusInfo;
+	}
+}
+
+void refineJobsStatuses(Job* headJob) {
+	for (Job* job = headJob; job != NULL; job = job->next) {
+		refineJobStatus(job);
+	}
+	// TODO: Добавить маркировку изменённых статусов, чтобы выводить только изменённые jobs'ы при необходимости
 }
 
 Process* getProcessByPid(Job* job, pid_t pid) {

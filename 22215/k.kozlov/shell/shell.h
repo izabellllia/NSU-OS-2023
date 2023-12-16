@@ -1,65 +1,17 @@
-#include <unistd.h>
-#include <sys/wait.h>
+#pragma once
 
-#define MAXARGS 256
-#define MAXCMDS 50
+#include "shell_structs.h"
 
+extern int terminalDescriptor;
+extern pid_t shellPgid;
+extern struct termios defaultTerminalSettings;
+extern int bgFreeNumber;
+extern Job* headBgJobFake;
+extern Job* lastBgJob;
 extern char readInterruptionFlag;
+extern char prompt[1024];
 
-typedef struct command {
-	char *cmdargs[MAXARGS];
-	char cmdflag;
-} Command;
-
-/*  cmdflag's  */
-#define OUTPIP  01
-#define INPIP   02
-
-typedef struct process
-{
-	Command cmd;
-	pid_t pid;
-	siginfo_t statusInfo;
-	struct process* prev;
-	struct process* next;
-} Process;
-
-typedef struct job {
-	Process* headProcess;
-	pid_t pgid;
-	char initialFg;
-	int bgNumber;
-	char stopped;
-	int inFd;
-	int outFd;
-	char* inPath;
-	char* outPath;
-	char appendFlag;
-	int pipesFds[MAXCMDS-1][2];
-	struct job* prev;
-	struct job* next;
-} Job;
-
-Job* createNewJob(Job* headJob);
-
-Process* createNewProcessInJob(Job* job, Command cmd);
-
-void extractJobFromList(Job* job);
-Job* getJobByBgNumber(Job* headJob, int bgNumber);
-
-Process* getProcessByPid(Job* job, pid_t pid);
-
-int isAllProcessesTerminated(Job* job);
-
-void printJobs(Job* headJob);
-void printJob(Job* job);
-
-void printProcesses(Job* job);
-void printProcess(Process* process);
-
-void freeJobs(Job* headJob);
-
-void freeProcesses(Process* headProcess);
-
-struct job* parseline(char *);
+Job* parseline(char *);
 int promptline(char *, char *, int);
+
+void waitFgJob(Job* job);
