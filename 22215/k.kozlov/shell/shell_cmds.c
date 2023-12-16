@@ -13,40 +13,39 @@
 int processShellSpecificMainCommand(Job* job) {
 	Process* process = job->headProcess;
 	if (process->next || !process->cmd.cmdargs[1]) {
-		return -1;
+		return 0;
 	}
 	if (process->cmd.cmdargs[1][0] == '%') {
 		if (strcmp(process->cmd.cmdargs[0], "fg") == 0) {
 			fg_cmd(process->cmd.cmdargs[1]);
-			return 0;
+			return 1;
 		}
 		if (strcmp(process->cmd.cmdargs[0], "bg") == 0) {
 			bg_cmd(process->cmd.cmdargs[1]);
-			return 0;
+			return 2;
 		}
 		if (strcmp(process->cmd.cmdargs[0], "kill") == 0) {
 			kill_cmd(process->cmd.cmdargs[1]);
-			return 0;
+			return 3;
 		}
 	}
 	if (strcmp(process->cmd.cmdargs[0], "cd") == 0) {
 		cd_cmd(process->cmd.cmdargs[1]);
-		return 0;
+		return 4;
 	}
-	return -1;
+	return 0;
 }
 
 int processShellSpecificForkedCommand(Process* process) {
 	if (strcmp(process->cmd.cmdargs[0], "jobs") == 0) {
 		jobs_cmd();
-		return 0;
+		return 1;
 	}
-	return -1;
+	return 0;
 }
 
 void jobs_cmd() {
-	// TODO: Реализовать более человеческий метод вывода
-	printJobs(headBgJobFake->next);
+	printJobsNotifications(headBgJobFake->next, 0);
 }
 
 static int parseFromIntFromPercentArg(char* arg) {
@@ -89,7 +88,7 @@ void kill_cmd(char* argNum) {
 		fprintf(stderr, "Background job %d wasn't found\n", bgNumber);
 		return;
 	}
-	sigsend(P_PGID, bgJob->pgid, SIGINT);
+	sigsend(P_PGID, bgJob->pgid, SIGKILL);
 }
 
 void cd_cmd(char* path) {

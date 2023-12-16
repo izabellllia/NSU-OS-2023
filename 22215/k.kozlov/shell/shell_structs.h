@@ -30,6 +30,7 @@ typedef struct job {
 	char initialFg;
 	int bgNumber;
 	char status;
+	char notified;
 	int inFd;
 	int outFd;
 	char* inPath;
@@ -39,9 +40,9 @@ typedef struct job {
 	struct job* next;
 } Job;
 
-#define J_SETTING -1
-#define J_RUNNING 0
-#define J_DONE 1
-#define J_EXIT 2
-#define J_TERMINATED 3
-#define J_STOPPED 4
+#define J_SETTING 0
+#define J_RUNNING 1
+#define J_DONE 2
+#define J_EXIT 3
+#define J_TERMINATED 4
+#define J_STOPPED 5

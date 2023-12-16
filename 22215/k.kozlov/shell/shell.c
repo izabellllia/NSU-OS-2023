@@ -65,14 +65,16 @@ int main(int argc, char *argv[])
 			continue;
 		nextJob = newJobsHead;
 		while (nextJob != NULL) {
+			refineJobsStatuses(headBgJobFake->next);
+
 			currentJob = nextJob;
 			nextJob = nextJob->next;
 			extractJobFromList(currentJob);
-			refineJobsStatuses(headBgJobFake->next);
 			if (!processShellSpecificMainCommand(currentJob))
-				continue;
-			processJob(currentJob);
-			// TODO: Опрашивать фоновые jobs'ы и выводить их статусы (возможно только неизменные)
+				processJob(currentJob);
+			
+			refineJobsStatuses(headBgJobFake->next);
+			printJobsNotifications(headBgJobFake->next, 1);
 		}
 	}
 	fprintf(stderr, "Bye!\n");
@@ -141,7 +143,7 @@ int processJob(Job* job) {
 
 			setInputOutputRedirection(job, currentProcess, prevPipes, newPipes);
 
-			if (!processShellSpecificForkedCommand(currentProcess))
+			if (processShellSpecificForkedCommand(currentProcess))
 				exit(0);
 
 			execvp(currentProcess->cmd.cmdargs[0], currentProcess->cmd.cmdargs);
@@ -167,9 +169,7 @@ int processJob(Job* job) {
 		tcsetattr(terminalDescriptor, TCSAFLUSH, &defaultTerminalSettings);
 	}
 	else {
-		int bgNumber = addJobToBg(job);
-		fprintf(stderr, "Background job %d:\n", bgNumber);
-		printJobs(job);
+		addJobToBg(job);
 	}
 	return 0;
 }
@@ -230,27 +230,23 @@ void waitFgJob(Job* job) {
 		}
 		Process* p = getProcessByPid(job, statusInfo.si_pid);
 		p->statusInfo = statusInfo;
-		if (p->statusInfo.si_code == CLD_EXITED && p->statusInfo.si_status != 0) {
-			fprintf(stderr, "Process terminated with exit code %d\n", p->statusInfo.si_status);
-			printProcess(p);
-		}
+		// if (p->statusInfo.si_code == CLD_EXITED && p->statusInfo.si_status != 0) {
+		// 	fprintf(stderr, "Process terminated with exit code %d\n", p->statusInfo.si_status);
+		// }
 		if (p->statusInfo.si_code == CLD_KILLED) {
-			fprintf(stderr, "Process killed by signal\n");
-			printProcess(p);
+			fprintf(stdout, "\n");
 		}
 		if (p->statusInfo.si_code == CLD_STOPPED) {
-			fprintf(stderr, "Job stopped\n");
-			extractJobFromList(job); // In fact, unnecessary but more safe
+			extractJobFromList(job);
 			addJobToBg(job);
-			printJobs(job);
 			break;
 		}
 		if (p->statusInfo.si_code == CLD_CONTINUED) {
-			fprintf(stderr, "Job continued\n");
-			printJobs(job);
 			break;
 		}
-		// TODO: Реализовать обработку остановку потомка по SIGTSTP
+	}
+	if (isAllProcessesTerminated(job)) {
+		// TODO: чистим память от fg-процесса
 	}
 }
 
@@ -267,8 +263,6 @@ int addJobToBg(Job* job) {
 	}
 	return bgFreeNumber++;
 }
-
-// TODO: Сделать wait-опросник для фоновых процессов
 
 void handleSigInt() {}
 

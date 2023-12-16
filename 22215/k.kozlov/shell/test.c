@@ -15,11 +15,14 @@
 #include <termios.h>
 #include <time.h>
 
-int main() {
-	struct timespec delay;
-	delay.tv_sec = 5;
-	delay.tv_nsec = 1000000000;
-	sleep(10);
-	fprintf(stdout, "Time is out\n");
+int main(int argc, char** argv) {
+	if (argc != 3) {
+		fprintf(stderr, "Invalid args\n");
+		exit(-1);
+	}
+	int delay;
+	sscanf(argv[1], "%d", &delay);
+	sleep(delay);
+	fprintf(stdout, "%s\n", argv[2]);
 	return 0;
 }
