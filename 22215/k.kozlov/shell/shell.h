@@ -7,7 +7,6 @@ extern pid_t shellPgid;
 extern struct termios defaultTerminalSettings;
 extern int bgFreeNumber;
 extern Job* headBgJobFake;
-extern Job* lastBgJob;
 extern char readInterruptionFlag;
 extern char prompt[1024];
 

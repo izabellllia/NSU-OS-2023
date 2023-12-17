@@ -37,7 +37,6 @@ static void setInputOutputRedirection(Job* job, Process* process, int* prevPipes
 
 int bgFreeNumber = 1;
 Job* headBgJobFake = NULL;
-Job* lastBgJob;
 static int addJobToBg(Job* job);
 
 char readInterruptionFlag = 0;
@@ -65,7 +64,7 @@ int main(int argc, char *argv[])
 			continue;
 		nextJob = newJobsHead;
 		while (nextJob != NULL) {
-			refineJobsStatuses(headBgJobFake->next);
+			updateJobsStatuses(headBgJobFake->next);
 
 			currentJob = nextJob;
 			nextJob = nextJob->next;
@@ -73,12 +72,19 @@ int main(int argc, char *argv[])
 			if (!processShellSpecificMainCommand(currentJob))
 				processJob(currentJob);
 			
-			refineJobsStatuses(headBgJobFake->next);
+			updateJobsStatuses(headBgJobFake->next);
 			printJobsNotifications(headBgJobFake->next, 1);
+			cleanJobs(headBgJobFake->next);
 		}
 	}
+	if (headBgJobFake->next) {
+		fprintf(stderr, "\nThese background jobs will get SIGHUP:\n");
+		sendSigHups(headBgJobFake->next);
+		updateJobsStatuses(headBgJobFake->next);
+		printJobsNotifications(headBgJobFake->next, 0);
+	}
 	fprintf(stderr, "Bye!\n");
-	// TODO: Чистить память от jobs'ов
+	freeJobs(headBgJobFake);
 	return 0;
 }
 
@@ -110,7 +116,6 @@ void initShell() {
 	setSigIntHandler();
 	tcgetattr(terminalDescriptor, &defaultTerminalSettings);
 	headBgJobFake = createNewJob(headBgJobFake);
-	lastBgJob = headBgJobFake;
 }
 
 int processJob(Job* job) {
@@ -218,7 +223,7 @@ void setInputOutputRedirection(Job* job, Process* process, int* prevPipes, int* 
 void waitFgJob(Job* job) {
 	siginfo_t statusInfo;
 	int options = WEXITED | WSTOPPED;
-	while (!isAllProcessesTerminated(job)) {
+	while (!isAllProcessesEnded(job)) {
 		if (waitid(P_PGID, job->pgid, &statusInfo, options) == -1) {
 			if (errno == EINTR) {
 				fprintf(stderr, "Wait was interrupted by signal\n");
@@ -245,22 +250,20 @@ void waitFgJob(Job* job) {
 			break;
 		}
 	}
-	if (isAllProcessesTerminated(job)) {
-		// TODO: чистим память от fg-процесса
+	if (isAllProcessesEnded(job)) {
+		extractJobFromList(job);
+		freeJob(job);
 	}
 }
 
 int addJobToBg(Job* job) {
 	job->bgNumber = bgFreeNumber;
-	if (!headBgJobFake) {
-		headBgJobFake = job;
-		lastBgJob = job;
+	Job* lastBgJob = headBgJobFake;
+	while (lastBgJob->next != NULL) {
+		lastBgJob = lastBgJob->next;
 	}
-	else {
-		lastBgJob->next = job;
-		job->prev = lastBgJob;
-		lastBgJob = job;
-	}
+	lastBgJob->next = job;
+	job->prev = lastBgJob;
 	return bgFreeNumber++;
 }
 

@@ -5,6 +5,7 @@
 #include <wait.h>
 #include <sys/wait.h>
 #include <errno.h>
+#include <signal.h>
 
 #include "shell_structs.h"
 #include "jobs.h"
@@ -110,31 +111,44 @@ void updateJobStatus(Job* job) {
 		job->notified = 0;
 }
 
-void refineJobStatus(Job* job) {
+void updateJobSiginfo(Job* job) {
 	siginfo_t newStatusInfo;
 	int options = WEXITED | WSTOPPED | WCONTINUED | WNOHANG;
 	while (1) {
 		if (waitid(P_PGID, job->pgid, &newStatusInfo, options) != 0) {
 			if (errno != ECHILD)
 				perror("Error in bg jobs refining");
-			break;
+			return;
 		}
 		if (newStatusInfo.si_pid == 0) {
-			break;
+			return;
 		}
 		Process* p = getProcessByPid(job, newStatusInfo.si_pid);
 		p->statusInfo = newStatusInfo;
 	}
-	updateJobStatus(job);
 }
 
-void refineJobsStatuses(Job* headJob) {
+void updateJobsStatuses(Job* headJob) {
 	for (Job* job = headJob; job != NULL; job = job->next) {
-		refineJobStatus(job);
+		updateJobSiginfo(job);
+		updateJobStatus(job);
 	}
 }
 
-int isAllProcessesTerminated(Job* job) {
+void cleanJobs(Job* headJob) {
+	Job* job;
+	Job* nextJob = headJob;
+	while (nextJob != NULL) {
+		job = nextJob;
+		nextJob = job->next;
+		if (isAllProcessesEnded(job) && job->notified) {
+			extractJobFromList(job);
+			freeJob(job);
+		}
+	}
+}
+
+int isAllProcessesEnded(Job* job) {
 	for (Process* proc = job->headProcess; proc != NULL; proc = proc->next) {
 		if (proc->statusInfo.si_code != CLD_EXITED && proc->statusInfo.si_code != CLD_KILLED)
 			return 0;
@@ -283,11 +297,36 @@ void freeJobs(Job* headJob) {
 	{
 		jobForDeletion = currJob;
 		currJob = currJob->next;
-		freeProcesses(jobForDeletion->headProcess);
-		if (jobForDeletion->inPath)
-			free(jobForDeletion->inPath);
-		if (jobForDeletion->outPath)
-			free(jobForDeletion->outPath);
-		free(jobForDeletion);
+		freeJob(jobForDeletion);
+	}
+}
+
+void freeJob(Job* job) {
+	if (job->pgid != 0)
+		killZombies(job);
+	freeProcesses(job->headProcess);
+	if (job->inPath)
+		free(job->inPath);
+	if (job->outPath)
+		free(job->outPath);
+	free(job);
+}
+
+void sendSigHups(Job* headJob) {
+	for (Job* job = headJob; job != NULL; job = job->next) {
+		sigsend(P_PGID, job->pgid, SIGHUP);
+		sigsend(P_PGID, job->pgid, SIGCONT);
+	}
+}
+
+void killZombies(Job* job) {
+	siginfo_t info;
+	int options = WEXITED | WSTOPPED | WCONTINUED | WNOHANG;
+	while (1) {
+		if (waitid(P_PGID, job->pgid, &info, options) != 0) {
+			if (errno != ECHILD)
+				perror("Error in bg jobs refining");
+			return;
+		}
 	}
 }

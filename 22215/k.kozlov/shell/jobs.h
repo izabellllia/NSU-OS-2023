@@ -12,10 +12,11 @@ Job* getJobByBgNumber(Job* headJob, int bgNumber);
 Process* getProcessByPid(Job* job, pid_t pid);
 
 void updateJobStatus(Job* job);
-void refineJobStatus(Job* job);
-void refineJobsStatuses(Job* headJob);
+void updateJobSiginfo(Job* job);
+void updateJobsStatuses(Job* headJob);
+void cleanJobs(Job* headJob);
 
-int isAllProcessesTerminated(Job* job);
+int isAllProcessesEnded(Job* job);
 int isJobRunning(Job* job);
 int isJobDone(Job* job);
 int isJobExited(Job* job);
@@ -33,5 +34,8 @@ void printProcessesNotification(Job* job);
 void printProcessNotification(Process* process);
 
 void freeJobs(Job* headJob);
+void freeJob(Job* job);
+void sendSigHups(Job* headJob);
+void killZombies(Job* job);
 
 void freeProcesses(Process* headProcess);

@@ -61,8 +61,6 @@ void fg_cmd(char* argNum) {
 		fprintf(stderr, "Background job %d wasn't found\n", bgNumber);
 		return;
 	}
-	if (lastBgJob == bgJob)
-		lastBgJob = bgJob->prev;
 	extractJobFromList(bgJob);
 	tcsetpgrp(terminalDescriptor, bgJob->pgid);
 	sigsend(P_PGID, bgJob->pgid, SIGCONT);
