@@ -62,6 +62,7 @@ int main(int argc, char *argv[])
 		}
 		if ((newJobsHead = parseline(line)) == NULL)
 			continue;
+		// printJobs(newJobsHead);
 		nextJob = newJobsHead;
 		while (nextJob != NULL) {
 			updateJobsStatuses(headBgJobFake->next);
@@ -89,9 +90,9 @@ int main(int argc, char *argv[])
 }
 
 char* updatePrompt() {
-	char buf[1020] = "";
+	char buf[1017] = "";
 	getcwd(buf, sizeof(buf));
-	sprintf(prompt, "[%s] ", buf);
+	sprintf(prompt, "\n[%s]\n$ ", buf);
 	return prompt;
 }
 

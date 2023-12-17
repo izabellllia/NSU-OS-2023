@@ -29,6 +29,7 @@ int promptline(char *prompt, char *line, int sizline)
 			*(line+n) = ' ';
 			*(line+n-1) = ' ';
 			*(line+n-2) = ' ';
+			// n -= 2;
 			continue;   /*  read next line  */
 		}
 		return(n);      /* all done */

@@ -41,11 +41,15 @@ Job* createNewJob(Job* headJob) {
 Process* createNewProcessInJob(Job* job, Command cmd) {
 	Process* newProcess = (Process*) malloc(sizeof(Process));
 	newProcess->cmd.cmdflag = cmd.cmdflag;
-	int cmdArgIndex = 0;
-	while (cmd.cmdargs[cmdArgIndex]) {
-		newProcess->cmd.cmdargs[cmdArgIndex] = (char*) malloc(strlen(cmd.cmdargs[cmdArgIndex]));
-		strcpy(newProcess->cmd.cmdargs[cmdArgIndex], cmd.cmdargs[cmdArgIndex]);
-		cmdArgIndex++;
+	
+	for (int cmdArgIndex = 0; cmdArgIndex < MAXARGS; ++cmdArgIndex) {
+		if (cmd.cmdargs[cmdArgIndex]) {
+			newProcess->cmd.cmdargs[cmdArgIndex] = (char*) malloc(strlen(cmd.cmdargs[cmdArgIndex]));
+			strcpy(newProcess->cmd.cmdargs[cmdArgIndex], cmd.cmdargs[cmdArgIndex]);
+		}
+		else {
+			newProcess->cmd.cmdargs[cmdArgIndex] = (char*) NULL;
+		}
 	}
 	newProcess->pid = 0;
 	newProcess->statusInfo.si_code = 0;

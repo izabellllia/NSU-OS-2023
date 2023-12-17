@@ -22,14 +22,17 @@ Job* parseline(char *line)
 	int nargs = 0, ncmds = 0;
 	char *currentLinePtr;
 	char error = 0;
-	static char delim[] = " \t|&<>;\n";
+	static char delim[] = " \t|&<>;\n\"";
 	// TODO: добавить корректный парсинг аргументов кавычках
 
 	/* initialize  */
 	currentLinePtr = line;
-	cmds[0].cmdargs[0] = (char *) NULL;
-	for (int i = 0; i < MAXCMDS; i++)
-		cmds[i].cmdflag = 0;
+	for (int cmdIndex = 0; cmdIndex < MAXCMDS; ++cmdIndex) {
+		cmds[cmdIndex].cmdflag = 0;
+		for (int argIndex = 0; argIndex < MAXARGS; ++argIndex) {
+			cmds[cmdIndex].cmdargs[argIndex] = (char*) NULL;
+		}
+	}
 
 	while (*currentLinePtr) {        /* until line has been parsed */
 		currentLinePtr = blankskip(currentLinePtr);       /*  skip white space */
@@ -66,15 +69,9 @@ Job* parseline(char *line)
 
 			outfile = currentLinePtr;
 			currentLinePtr = strpbrk(currentLinePtr, delim);
-			newJob->outPath = (char*) malloc(currentLinePtr - outfile);
+			newJob->outPath = (char*) malloc(currentLinePtr - outfile + 1);
 			memcpy(newJob->outPath, outfile, currentLinePtr - outfile);
-			// newJob->inPath[currentLinePtr - outfile] = '\0';
-			// newJob->outFd = open(tmpStr, flags);
-			// if (newJob->outFd < 0) {
-			// 	perror("STDOUT redefining error");
-			// 	error = 1;
-			// 	break;
-			// }
+			newJob->outPath[currentLinePtr - outfile] = '\0';
 			if (isspace(*currentLinePtr))
 				*currentLinePtr++ = '\0';
 			continue;
@@ -89,15 +86,9 @@ Job* parseline(char *line)
 			}
 			infile = currentLinePtr;
 			currentLinePtr = strpbrk(currentLinePtr, delim);
-			newJob->inPath = (char*) malloc(currentLinePtr - infile);
+			newJob->inPath = (char*) malloc(currentLinePtr - infile + 1);
 			memcpy(newJob->inPath, infile, currentLinePtr - infile);
-			// newJob->inPath[currentLinePtr - infile] = '\0';
-			// newJob->inFd = open(tmpStr, O_RDONLY);
-			// if (newJob->inFd < 0) {
-			// 	perror("STDIN redefining error");
-			// 	error = 1;
-			// 	break;
-			// }
+			newJob->inPath[currentLinePtr - infile] = '\0';
 			if (isspace(*currentLinePtr))
 				*currentLinePtr++ = '\0';
 			continue;
@@ -115,9 +106,18 @@ Job* parseline(char *line)
 			nargs = 0;
 			continue;
 		}
+		if (*currentLinePtr == '"') {
+			*currentLinePtr++ = '\0';
+			cmds[ncmds].cmdargs[nargs++] = currentLinePtr;
+			cmds[ncmds].cmdargs[nargs] = NULL;
+			currentLinePtr = strpbrk(currentLinePtr, "\"\n\0");
+			if (*currentLinePtr)
+				*currentLinePtr++ = '\0';
+			continue;
+		}
 		/*  a command argument  */
 		cmds[ncmds].cmdargs[nargs++] = currentLinePtr;
-		cmds[ncmds].cmdargs[nargs] = (char *) NULL;
+		cmds[ncmds].cmdargs[nargs] = NULL;
 		currentLinePtr = strpbrk(currentLinePtr, delim);
 		if (isspace(*currentLinePtr))
 			*currentLinePtr++ = '\0';
