@@ -42,10 +42,13 @@ Process* createNewProcessInJob(Job* job, Command cmd) {
 	Process* newProcess = (Process*) malloc(sizeof(Process));
 	newProcess->cmd.cmdflag = cmd.cmdflag;
 	
+	int argLen = 0;
 	for (int cmdArgIndex = 0; cmdArgIndex < MAXARGS; ++cmdArgIndex) {
 		if (cmd.cmdargs[cmdArgIndex]) {
-			newProcess->cmd.cmdargs[cmdArgIndex] = (char*) malloc(strlen(cmd.cmdargs[cmdArgIndex]));
+			argLen = strlen(cmd.cmdargs[cmdArgIndex]);
+			newProcess->cmd.cmdargs[cmdArgIndex] = (char*) malloc(argLen + 1);
 			strcpy(newProcess->cmd.cmdargs[cmdArgIndex], cmd.cmdargs[cmdArgIndex]);
+			newProcess->cmd.cmdargs[cmdArgIndex][argLen] = '\0';
 		}
 		else {
 			newProcess->cmd.cmdargs[cmdArgIndex] = (char*) NULL;
@@ -160,7 +163,6 @@ int isAllProcessesEnded(Job* job) {
 	return 1;
 }
 
-// Assume job as running when at least one process is running
 int isJobRunning(Job* job) {
 	for (Process* proc = job->headProcess; proc != NULL; proc = proc->next) {
 		if (proc->statusInfo.si_code == 0 || proc->statusInfo.si_code == CLD_CONTINUED)
@@ -169,7 +171,6 @@ int isJobRunning(Job* job) {
 	return 0;
 }
 
-// Assume job as done when all processes ended with exit code 0
 int isJobDone(Job* job) {
 	for (Process* proc = job->headProcess; proc != NULL; proc = proc->next) {
 		if (proc->statusInfo.si_code != CLD_EXITED || proc->statusInfo.si_status != 0)
@@ -178,7 +179,6 @@ int isJobDone(Job* job) {
 	return 1;
 }
 
-// Assume job as exited when at least one process exited with exit code not 0
 int isJobExited(Job* job) {
 	for (Process* proc = job->headProcess; proc != NULL; proc = proc->next) {
 		if (proc->statusInfo.si_code == CLD_EXITED && proc->statusInfo.si_status != 0)
@@ -187,7 +187,6 @@ int isJobExited(Job* job) {
 	return 0;
 }
 
-// Assume job as killed when at least one process was killed by a signal
 int isJobTerminated(Job* job) {
 	for (Process* proc = job->headProcess; proc != NULL; proc = proc->next) {
 		if (proc->statusInfo.si_code == CLD_KILLED)
@@ -196,7 +195,6 @@ int isJobTerminated(Job* job) {
 	return 0;
 }
 
-// Assume job as exited when at least one process exited with exit code not 0
 int isJobStopped(Job* job) {
 	for (Process* proc = job->headProcess; proc != NULL; proc = proc->next) {
 		if (proc->statusInfo.si_code == CLD_STOPPED)
@@ -278,22 +276,6 @@ void printProcessNotification(Process* process) {
 	fprintf(stdout, "\n");
 }
 
-void freeProcesses(Process* headProcess) {
-	Process* currProcess = headProcess;
-	Process* processForDeletion;
-	while (currProcess)
-	{
-		processForDeletion = currProcess;
-		currProcess = currProcess->next;
-		int cmdArgIndex = 0;
-		while (processForDeletion->cmd.cmdargs[cmdArgIndex]) {
-			free(processForDeletion->cmd.cmdargs[cmdArgIndex]);
-			cmdArgIndex++;
-		}
-		free(processForDeletion);
-	}
-}
-
 void freeJobs(Job* headJob) {
 	Job* currJob = headJob;
 	Job* jobForDeletion;
@@ -316,13 +298,6 @@ void freeJob(Job* job) {
 	free(job);
 }
 
-void sendSigHups(Job* headJob) {
-	for (Job* job = headJob; job != NULL; job = job->next) {
-		sigsend(P_PGID, job->pgid, SIGHUP);
-		sigsend(P_PGID, job->pgid, SIGCONT);
-	}
-}
-
 void killZombies(Job* job) {
 	siginfo_t info;
 	int options = WEXITED | WSTOPPED | WCONTINUED | WNOHANG;
@@ -332,5 +307,28 @@ void killZombies(Job* job) {
 				perror("Error in bg jobs refining");
 			return;
 		}
+	}
+}
+
+void sendSigHups(Job* headJob) {
+	for (Job* job = headJob; job != NULL; job = job->next) {
+		sigsend(P_PGID, job->pgid, SIGHUP);
+		sigsend(P_PGID, job->pgid, SIGCONT);
+	}
+}
+
+void freeProcesses(Process* headProcess) {
+	Process* currProcess = headProcess;
+	Process* processForDeletion;
+	while (currProcess)
+	{
+		processForDeletion = currProcess;
+		currProcess = currProcess->next;
+		int cmdArgIndex = 0;
+		while (processForDeletion->cmd.cmdargs[cmdArgIndex]) {
+			free(processForDeletion->cmd.cmdargs[cmdArgIndex]);
+			cmdArgIndex++;
+		}
+		free(processForDeletion);
 	}
 }

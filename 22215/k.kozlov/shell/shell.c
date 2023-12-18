@@ -16,10 +16,6 @@
 #include "jobs.h"
 #include "shell_cmds.h"
 
-/*
-	Reference - https://www.gnu.org/software/libc/manual/html_node/Stopped-and-Terminated-Jobs.html
-*/
-
 // TODO: задокументировать всё
 
 static char* updatePrompt();
@@ -236,18 +232,15 @@ void waitFgJob(Job* job) {
 		}
 		Process* p = getProcessByPid(job, statusInfo.si_pid);
 		p->statusInfo = statusInfo;
-		// if (p->statusInfo.si_code == CLD_EXITED && p->statusInfo.si_status != 0) {
-		// 	fprintf(stderr, "Process terminated with exit code %d\n", p->statusInfo.si_status);
-		// }
+		if (p->statusInfo.si_code == CLD_EXITED && p->statusInfo.si_status != 0) {
+			fprintf(stderr, "Process ended with exit code %d\n", p->statusInfo.si_status);
+		}
 		if (p->statusInfo.si_code == CLD_KILLED) {
 			fprintf(stdout, "\n");
 		}
 		if (p->statusInfo.si_code == CLD_STOPPED) {
 			extractJobFromList(job);
 			addJobToBg(job);
-			break;
-		}
-		if (p->statusInfo.si_code == CLD_CONTINUED) {
 			break;
 		}
 	}

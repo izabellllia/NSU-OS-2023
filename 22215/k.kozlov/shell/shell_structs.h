@@ -1,3 +1,6 @@
+/*
+	Хэдэр со структурами, используемыми почти во всех модулях шелла
+*/
 #pragma once
 
 #include <unistd.h>
@@ -6,20 +9,31 @@
 #define MAXARGS 256
 #define MAXCMDS 50
 
+/*
+	Хранит список аргументов команды и битовый флаг для пайпов
+*/
 typedef struct command {
 	char *cmdargs[MAXARGS];
 	char cmdflag;
 } Command;
 
-/*  cmdflag's  */
+/*
+	Значения cmdflag. Записываются побитово
+*/
 #define OUTPIP  01
 #define INPIP   02
+
+/*
+	И процесс, и задача, реализованы через двусвязные списки 
+	(хорошей была бы идея отдельно создать структуру списка и отдельно уже собственно 
+	процесс и задачу, но заморачиваться здесь над полиморфизмом мне не хотелось совершенно)
+*/
 
 typedef struct process
 {
 	Command cmd;
 	pid_t pid;
-	siginfo_t statusInfo;
+	siginfo_t statusInfo; // Поле для сохранения статуса процесса, полученного из waitid
 	struct process* prev;
 	struct process* next;
 } Process;
@@ -27,7 +41,7 @@ typedef struct process
 typedef struct job {
 	Process* headProcess;
 	pid_t pgid;
-	char initialFg;
+	char initialFg; // Описывает, должна ли задача переводиться в фон при запуске и никак не используется в дальнейшем
 	int bgNumber;
 	char status;
 	char notified;
@@ -40,6 +54,7 @@ typedef struct job {
 	struct job* next;
 } Job;
 
+// Возможные значения поля Job.status
 #define J_SETTING 0
 #define J_RUNNING 1
 #define J_DONE 2

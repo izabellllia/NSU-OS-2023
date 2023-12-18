@@ -23,7 +23,6 @@ Job* parseline(char *line)
 	char *currentLinePtr;
 	char error = 0;
 	static char delim[] = " \t|&<>;\n\"";
-	// TODO: добавить корректный парсинг аргументов кавычках
 
 	/* initialize  */
 	currentLinePtr = line;
