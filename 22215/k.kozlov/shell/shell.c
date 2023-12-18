@@ -16,84 +16,7 @@
 #include "jobs.h"
 #include "shell_cmds.h"
 
-// TODO: задокументировать всё
-
-static char* updatePrompt();
-
-int terminalDescriptor;
-pid_t shellPgid;
-struct termios defaultTerminalSettings;
-static void initShell();
-
-static int processJob(Job* job);
-
-static int substituteDescriptor(int sourceFd, int targetFd);
-
-static void setInputOutputRedirection(Job* job, Process* process, int* prevPipes, int* newPipes);
-
-int bgFreeNumber = 1;
-Job* headBgJobFake = NULL;
-static int addJobToBg(Job* job);
-
-char readInterruptionFlag = 0;
-static void handleSigInt();
-static void setSigIntHandler();
-
-char prompt[1024];
-
-int main(int argc, char *argv[])
-{
-	char line[1024];      /*  allow large command lines  */
-	Job* newJobsHead;
-	Job* currentJob;
-	Job* nextJob;
-
-	initShell();
-
-	while (promptline(updatePrompt(), line, sizeof(line)) > 0) {
-		if (readInterruptionFlag) {
-			fprintf(stderr, "\n");
-			readInterruptionFlag = 0;
-			continue;
-		}
-		if ((newJobsHead = parseline(line)) == NULL)
-			continue;
-		// printJobs(newJobsHead);
-		nextJob = newJobsHead;
-		while (nextJob != NULL) {
-			updateJobsStatuses(headBgJobFake->next);
-
-			currentJob = nextJob;
-			nextJob = nextJob->next;
-			extractJobFromList(currentJob);
-			if (!processShellSpecificMainCommand(currentJob))
-				processJob(currentJob);
-			
-			updateJobsStatuses(headBgJobFake->next);
-			printJobsNotifications(headBgJobFake->next, 1);
-			cleanJobs(headBgJobFake->next);
-		}
-	}
-	if (headBgJobFake->next) {
-		fprintf(stderr, "\nThese background jobs will get SIGHUP:\n");
-		sendSigHups(headBgJobFake->next);
-		updateJobsStatuses(headBgJobFake->next);
-		printJobsNotifications(headBgJobFake->next, 0);
-	}
-	fprintf(stderr, "Bye!\n");
-	freeJobs(headBgJobFake);
-	return 0;
-}
-
-char* updatePrompt() {
-	char buf[1017] = "";
-	getcwd(buf, sizeof(buf));
-	sprintf(prompt, "\n[%s]\n$ ", buf);
-	return prompt;
-}
-
 void initShell() {
-	// Initializing shell in separated group and set it as a foreground group for terminal
 	terminalDescriptor = STDIN_FILENO;
 	if (!isatty(terminalDescriptor)) {
 		perror("Cannot get terminal");
@@ -115,6 +38,18 @@ void initShell() {
 	headBgJobFake = createNewJob(headBgJobFake);
 }
 
+void handleSigInt() {}
+
+void setSigIntHandler() {
+	sigset_t set;
+	sigemptyset(&set);
+	sigaddset(&set, SIGQUIT);
+	struct sigaction sigIntAction;
+	sigIntAction.sa_handler = handleSigInt;
+	sigIntAction.sa_mask = set;
+	sigaction(SIGINT, &sigIntAction, NULL);
+}
+
 int processJob(Job* job) {
 	Process* currentProcess = job->headProcess;
 	Process* nextProcess = currentProcess;
@@ -134,8 +69,6 @@ int processJob(Job* job) {
 			if (job->pgid == 0)
 				job->pgid = childId;
 			setpgid(childId, job->pgid);
-			if (job->initialFg)
-				tcsetpgrp(terminalDescriptor, job->pgid);
 
 			signal(SIGINT, SIG_DFL);
 			signal(SIGTSTP, SIG_DFL);
@@ -207,10 +140,14 @@ void setInputOutputRedirection(Job* job, Process* process, int* prevPipes, int* 
 		// fprintf(stderr, "Get output pipe from %d\n", newPipes[1]);
 		job->outFd = newPipes[1];
 	}
-	if (job->inFd != STDIN_FILENO)
+	if (job->inFd != STDIN_FILENO) {
 		substituteDescriptor(job->inFd, STDIN_FILENO);
-	if (job->outFd != STDOUT_FILENO)
+		close(job->inFd);
+	}
+	if (job->outFd != STDOUT_FILENO) {
 		substituteDescriptor(job->outFd, STDOUT_FILENO);
+		close(job->outFd);
+	}
 	close(newPipes[0]);
 	close(newPipes[1]);
 	close(prevPipes[0]);
@@ -259,17 +196,4 @@ int addJobToBg(Job* job) {
 	lastBgJob->next = job;
 	job->prev = lastBgJob;
 	return bgFreeNumber++;
-}
-
-void handleSigInt() {}
-
-void setSigIntHandler() {
-	sigset_t set;
-	sigemptyset(&set);
-	sigaddset(&set, SIGQUIT);
-	struct sigaction sigIntAction;
-	sigIntAction.sa_handler = handleSigInt;
-	sigIntAction.sa_mask = set;
-	// sigIntAction.sa_flags = SA_RESTART;
-	sigaction(SIGINT, &sigIntAction, NULL);
 }

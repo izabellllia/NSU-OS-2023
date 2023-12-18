@@ -10,6 +10,18 @@
 #include "jobs.h"
 #include "shell_cmds.h"
 
+int processShellSpecificForkedCommand(Process* process) {
+	if (strcmp(process->cmd.cmdargs[0], "jobs") == 0) {
+		jobs_cmd();
+		return 1;
+	}
+	return 0;
+}
+
+void jobs_cmd() {
+	printJobsNotifications(headBgJobFake->next, 0);
+}
+
 int processShellSpecificMainCommand(Job* job) {
 	Process* process = job->headProcess;
 	if (process->next || !process->cmd.cmdargs[1]) {
@@ -34,18 +46,6 @@ int processShellSpecificMainCommand(Job* job) {
 		return 4;
 	}
 	return 0;
-}
-
-int processShellSpecificForkedCommand(Process* process) {
-	if (strcmp(process->cmd.cmdargs[0], "jobs") == 0) {
-		jobs_cmd();
-		return 1;
-	}
-	return 0;
-}
-
-void jobs_cmd() {
-	printJobsNotifications(headBgJobFake->next, 0);
 }
 
 static int parseFromIntFromPercentArg(char* arg) {

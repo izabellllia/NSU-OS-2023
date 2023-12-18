@@ -5,6 +5,13 @@
 
 #include "shell.h"
 
+char* updatePrompt() {
+	char buf[1017] = "";
+	getcwd(buf, sizeof(buf));
+	sprintf(prompt, "\n[%s]\n$ ", buf);
+	return prompt;
+}
+
 int promptline(char *prompt, char *line, int sizline)
 {
 	int n = 0;
