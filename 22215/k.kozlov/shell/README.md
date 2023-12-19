@@ -35,3 +35,15 @@ Shell-специфичные команды:
 7. Память из-под фоновых задач будет освобождена в случае, когда при очередном опросе их статус был изменён на завершённый
 
 ## Примеры интересных команд
+```bash
+echo 4 > input.txt ; ./plus_one.out | ./plus_one.out | ./plus_one.out | ./plus_one.out | ./plus_one.out | ./plus_one.out | ./plus_one.out < input.txt >> input.txt
+```
+
+```bash
+./write_with_delay.out 10 aaa
+# Жмём Ctrl+Z. Теперь aaa не будет выведено, пока мы не пропишем fg либо bg. Можем прописать и kill
+./write_with_delay.out 10 aaa > output.txt &
+# output.txt создастся сразу, а вот aaa появится в нём через 10 секунд
+```
+
+*Ну и многое другое...*

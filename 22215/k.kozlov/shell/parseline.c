@@ -139,6 +139,7 @@ Job* parseline(char *line)
 		}
 	}
 
+	// Избавляемся от пустой задачи в конце списка
 	newJob = headJob;
 	while (newJob->next) {
 		if (newJob->next->headProcess == NULL) {
@@ -148,12 +149,12 @@ Job* parseline(char *line)
 		}
 		newJob = newJob->next;
 	}
-	if (error) {
+
+	// Если у головной задачи нет процессов или где-то произошла ошибка, очищаем память из-под созданных задач (задачи) и возвращаем NULL
+	if (error || headJob->headProcess == NULL) {
 		freeJobs(headJob);
 		return NULL;
 	}
-	if (headJob->headProcess == NULL)
-		return NULL;
 	return headJob;
 }
 
