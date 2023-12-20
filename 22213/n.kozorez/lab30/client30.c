@@ -5,7 +5,6 @@
 #include <unistd.h>
 #include <string.h>
 
-
 char *socket_path = "./socket";
 
 int main(int argc, char *argv[]) {
@@ -33,7 +32,7 @@ int main(int argc, char *argv[]) {
 	ssize_t read_bytes;
 
 	memset(buffer, 0, sizeof(buffer));
-	while ( (read_bytes = read(STDIN_FILENO, buffer, sizeof(buffer))) > 0) {
+	while ((read_bytes = read(STDIN_FILENO, buffer, sizeof(buffer))) > 0) {
 		if (write(file_descriptor, buffer, read_bytes) != read_bytes) {
 			if (read_bytes > 0) {
 				fprintf(stderr, "partial write");
@@ -43,5 +42,5 @@ int main(int argc, char *argv[]) {
 			}
 		}
 	}
-    exit(EXIT_SUCCESS);
+	exit(EXIT_SUCCESS);
 }
