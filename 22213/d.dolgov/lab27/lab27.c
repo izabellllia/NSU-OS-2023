@@ -15,7 +15,7 @@ int main(int argc, char **argv) {
 
     if (fout == NULL) {
         fclose(fin);
-        perror("Cannot allocate memory");
+        perror("Error with popen");
     }
 
     while (fgets(line, BUFFER_SIZE, fin) != NULL) {
