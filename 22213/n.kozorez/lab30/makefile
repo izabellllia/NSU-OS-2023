@@ -1,5 +1,5 @@
 all: server client
 server:
-	gcc server30.c -o server
+	cc -lsocket server.c -o server
 client:
-	gcc client30.c -o client
+	cc -lsocket client.c -o client
