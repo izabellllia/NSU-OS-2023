@@ -55,6 +55,10 @@ void parseLetter(const char *pattern_, char *newPattern, int i, int *counter) {
         (*counter)++;
         newPattern[*counter] = '_';
         (*counter)++;
+        newPattern[*counter] = '\\';
+        (*counter)++;
+        newPattern[*counter] = '.';
+        (*counter)++;
         newPattern[*counter] = ']';
         (*counter)++;
         letterCounter++;
