@@ -4,6 +4,7 @@
 #include <sys/un.h>
 #include <unistd.h>
 #include <signal.h>
+#include <fcntl.h>
 #include <string.h>
 
 #define SOCK_FILE "server.sock"

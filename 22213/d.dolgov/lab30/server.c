@@ -9,7 +9,7 @@
 #define SOCKET_NAME "server.sock"
 #define BUFFER_SIZE 30
 
-int main(int argc, char *argv[]) {
+int main() {
     int descriptor;
     if ((descriptor = socket(AF_UNIX, SOCK_STREAM, 0)) == -1) {
         perror("Cannot create the socket");
