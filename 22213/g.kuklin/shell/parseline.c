@@ -80,7 +80,7 @@ int parseline(char *line) {
                 break;
             case '|':
                 if (nargs == 0) {
-                    fprintf(stderr, "No command to the left of the pipe\n");
+                    fprintf(stderr, "No command to the left of the pipe symbol\n");
                     return(-1);
                 }
                 if (cmds[ncmds].cmdflag & OUTREDIR) {
@@ -131,7 +131,7 @@ int parseline(char *line) {
      */
     if (cmds[ncmds-1].cmdflag & OUTPIPE) {
         if (nargs == 0) {
-            fprintf(stderr, "No command to the right of the pipe\n");
+            fprintf(stderr, "syntax error\n");
             return(-1);
         }
     }
