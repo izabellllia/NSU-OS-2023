@@ -9,6 +9,7 @@ int main(int argc, char **argv) {
 
     if ((fin = fopen(argv[1], "r")) == NULL) {
         perror("Fopen failed");
+        exit(EXIT_FAILURE);
     }
 
     fout = popen("wc -l", "w");
@@ -16,6 +17,7 @@ int main(int argc, char **argv) {
     if (fout == NULL) {
         fclose(fin);
         perror("Error with popen");
+        exit(EXIT_FAILURE);
     }
 
     while (fgets(line, BUFFER_SIZE, fin) != NULL) {
