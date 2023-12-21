@@ -8,7 +8,7 @@
 
 #define SOCKET_NAME "server.sock"
 #define BUFFER_SIZE 30
-
+// в чем прелесть пайпа, что закрывают примитивы синхронизации
 int main() {
     int descriptor;
     if ((descriptor = socket(AF_UNIX, SOCK_STREAM, 0)) == -1) {
@@ -22,20 +22,24 @@ int main() {
     strcpy(addr.sun_path, SOCKET_NAME);
     unlink(SOCKET_NAME);
 
-    if (bind(descriptor, (struct sockaddr *)&addr, sizeof(addr)) == -1) {
+    if (bind(descriptor, (struct sockaddr *) &addr, sizeof(addr)) == -1) {
         perror("Binding failure");
         exit(EXIT_FAILURE);
     }
     printf("Socket created\n");
 
     if (listen(descriptor, 1) == -1) {
+        close(descriptor);
         perror("Listening failure");
+        exit(EXIT_FAILURE);
     }
     printf("Server started listening\n");
 
     int accepted;
     if ((accepted = accept(descriptor, NULL, NULL)) == -1) {
         perror("Accept failed");
+        close(descriptor);
+        exit(EXIT_FAILURE);
     }
     printf("Server accepted a connection\n");
 
@@ -48,12 +52,18 @@ int main() {
 
         if ((write(1, buffer, actuallyReadBytes)) == -1) {
             perror("Write to buffer error!");
+            close(accepted);
+            close(descriptor);
+            unlink(SOCKET_NAME);
             exit(EXIT_FAILURE);
         }
     }
 
     if (actuallyReadBytes == -1) {
         perror("Read failure");
+        close(accepted);
+        close(descriptor);
+        unlink(SOCKET_NAME);
         exit(EXIT_FAILURE);
     }
     printf("Server finished its' work\n");

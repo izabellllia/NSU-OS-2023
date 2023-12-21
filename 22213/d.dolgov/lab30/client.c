@@ -33,14 +33,16 @@ int main() {
 
     if (connect(descriptor, (struct sockaddr *) &addr, sizeof(addr)) == -1) {
         perror("Connection failure");
+        close(descriptor);
         exit(EXIT_FAILURE);
     }
     printf("Connected to the server\n");
-    // доработать обработку всего подряд, заюзать принтфы
+
     while (1) {
         long red;
         if ((red = read(STDIN_FILENO, msgout, BUFFER_SIZE)) == -1) {
             perror("Read from buffer error!");
+            close(descriptor);
             exit(EXIT_FAILURE);
         }
 
@@ -48,6 +50,7 @@ int main() {
 
         if ((write(descriptor, msgout, dataLength)) == -1) {
             perror("Write to buffer error!");
+            close(descriptor);
             exit(EXIT_FAILURE);
         }
     }
