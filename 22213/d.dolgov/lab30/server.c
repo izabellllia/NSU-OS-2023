@@ -8,7 +8,7 @@
 
 #define SOCKET_NAME "server.sock"
 #define BUFFER_SIZE 30
-// в чем прелесть пайпа, что закрывают примитивы синхронизации
+
 int main() {
     int descriptor;
     if ((descriptor = socket(AF_UNIX, SOCK_STREAM, 0)) == -1) {
