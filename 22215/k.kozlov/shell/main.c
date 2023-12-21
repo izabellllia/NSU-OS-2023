@@ -19,7 +19,7 @@ char prompt[1024];
 	Основной цикл работы шелла. Здесь оставлю комментарии около конкретных строчек
 */
 int main(int argc, char *argv[]) {
-	char line[1024];
+	char line[LINE_SZ];
 	Job* newJobsHead;
 	Job* currentJob;
 	Job* nextJob;
@@ -28,7 +28,6 @@ int main(int argc, char *argv[]) {
 
 	// Запрашиваем команду повторно до тех пор, пока пользователь не пришёл EOF
 	while (promptline(updatePrompt(), line, sizeof(line)) > 0) {
-		fprintf(stderr, "%d\n", strlen(line));
 		// Проверка на прерывание чтения в promptline сигналом
 		if (readInterruptionFlag) {
 			fprintf(stderr, "\n");
@@ -38,6 +37,7 @@ int main(int argc, char *argv[]) {
 		// Пытаемся спарсить из прочитанной строки задачи и процессы в них
 		if ((newJobsHead = parseline(line)) == NULL)
 			continue;
+		printJobs(newJobsHead);
 		nextJob = newJobsHead;
 		while (nextJob != NULL) {
 			// Обновляем статусы фоновых задач перед обработкой текущей задачи для того, чтобы команда jobs показала актуальные статусы

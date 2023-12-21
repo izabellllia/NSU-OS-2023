@@ -6,6 +6,7 @@
 #include <sys/wait.h>
 #include <errno.h>
 #include <signal.h>
+#include <wordexp.h>
 
 #include "shell_structs.h"
 #include "jobs.h"
@@ -38,10 +39,21 @@ Job* createNewJob(Job* headJob) {
 	return newJob;
 }
 
+void constructWordExp(char** args, wordexp_t *p) {
+	char line[LINE_SZ];
+	strcat(line, args[0]);
+	for (int argIndex = 1; args[argIndex]; argIndex++) {
+		strcat(line, " ");
+		strcat(line, args[argIndex]);
+	}
+	wordexp(line, p, 0);
+}
+
 Process* createNewProcessInJob(Job* job, Command cmd) {
 	Process* newProcess = (Process*) malloc(sizeof(Process));
 	newProcess->cmd.cmdflag = cmd.cmdflag;
-	
+	newProcess->pipesFlags = cmd.cmdflag;
+
 	int argLen = 0;
 	for (int cmdArgIndex = 0; cmdArgIndex < MAXARGS; ++cmdArgIndex) {
 		if (cmd.cmdargs[cmdArgIndex]) {
@@ -54,6 +66,13 @@ Process* createNewProcessInJob(Job* job, Command cmd) {
 			newProcess->cmd.cmdargs[cmdArgIndex] = (char*) NULL;
 		}
 	}
+	strcat(newProcess->line, cmd.cmdargs[0]);
+	for (int argIndex = 1; cmd.cmdargs[argIndex]; argIndex++) {
+		strcat(newProcess->line, " ");
+		strcat(newProcess->line, cmd.cmdargs[argIndex]);
+	}
+	wordexp(newProcess->line, &newProcess->args, 0);
+	// constructWordExp(cmd.cmdargs, &newProcess->args);
 	newProcess->pid = 0;
 	newProcess->statusInfo.si_code = 0;
 	newProcess->statusInfo.si_status = 0;
@@ -231,8 +250,11 @@ void printProcess(Process* process) {
 	fprintf(stderr, "\tProcess %d, PIPES %d\n", process->pid, process->cmd.cmdflag);
 	fprintf(stderr, "\tCode %d\n\tStatus %d\n", 
 		process->statusInfo.si_code, process->statusInfo.si_status);
-	for (int argIndex = 0; process->cmd.cmdargs[argIndex]; argIndex++) {
-		fprintf(stderr, "\t\tArg %d: %s\n", argIndex, process->cmd.cmdargs[argIndex]);
+	// for (int argIndex = 0; process->cmd.cmdargs[argIndex]; argIndex++) {
+	// 	fprintf(stderr, "\t\tArg %d: %s\n", argIndex, process->cmd.cmdargs[argIndex]);
+	// }
+	for (int argIndex = 0; argIndex < process->args.we_wordc; argIndex++) {
+		fprintf(stderr, "\t\tArg %d: %s\n", argIndex, process->args.we_wordv[argIndex]);
 	}
 }
 
@@ -264,7 +286,8 @@ void printJobNotification(Job* job) {
 
 void printProcessesNotification(Job* job) {
 	for (Process* proc = job->headProcess; proc; proc = proc->next) {
-		printProcessNotification(proc);
+		// printProcessNotification(proc);
+		fprintf(stdout, "\t%s\n", proc->line);
 	}
 }
 
@@ -329,6 +352,7 @@ void freeProcesses(Process* headProcess) {
 			free(processForDeletion->cmd.cmdargs[cmdArgIndex]);
 			cmdArgIndex++;
 		}
+		wordfree(&processForDeletion->args);
 		free(processForDeletion);
 	}
 }

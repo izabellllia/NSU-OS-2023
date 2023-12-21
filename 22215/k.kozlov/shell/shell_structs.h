@@ -5,9 +5,11 @@
 
 #include <unistd.h>
 #include <sys/wait.h>
+#include <wordexp.h>
 
 #define MAXARGS 256
 #define MAXCMDS 50
+#define LINE_SZ 1024
 
 /*
 	Хранит список аргументов команды и битовый флаг для пайпов
@@ -31,7 +33,9 @@ typedef struct command {
 
 typedef struct process
 {
-	Command cmd;
+	char line[LINE_SZ];
+	wordexp_t args;
+	char pipesFlags;
 	pid_t pid;
 	siginfo_t statusInfo; // Поле для сохранения статуса процесса, полученного из waitid
 	struct process* prev;
