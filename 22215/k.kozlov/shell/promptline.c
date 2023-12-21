@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <string.h>
+#include <signal.h>
 #include <errno.h>
 
 #include "shell.h"
@@ -16,6 +17,7 @@ int promptline(char *prompt, char *line, int sizline)
 {
 	int n = 0;
 	int readCount;
+	--sizline;
 
 	write(1, prompt, strlen(prompt));
 	while (1) {
@@ -26,7 +28,6 @@ int promptline(char *prompt, char *line, int sizline)
 			return 1;
 		}
 		n += readCount;
-		*(line+n) = '\0';
 		/*
 		*  check to see if command line extends onto
 		*  next line.  If so, append next line to command line
@@ -36,9 +37,10 @@ int promptline(char *prompt, char *line, int sizline)
 			*(line+n) = ' ';
 			*(line+n-1) = ' ';
 			*(line+n-2) = ' ';
-			// n -= 2;
 			continue;   /*  read next line  */
 		}
+		*(line+n) = '\n';
+		*(line+n+1) = '\0';
 		return(n);      /* all done */
 	}
 }

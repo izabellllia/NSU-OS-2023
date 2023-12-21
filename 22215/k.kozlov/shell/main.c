@@ -1,3 +1,4 @@
+#include <string.h>
 #include <termios.h>
 #include <stdio.h>
 
@@ -27,6 +28,7 @@ int main(int argc, char *argv[]) {
 
 	// Запрашиваем команду повторно до тех пор, пока пользователь не пришёл EOF
 	while (promptline(updatePrompt(), line, sizeof(line)) > 0) {
+		fprintf(stderr, "%d\n", strlen(line));
 		// Проверка на прерывание чтения в promptline сигналом
 		if (readInterruptionFlag) {
 			fprintf(stderr, "\n");

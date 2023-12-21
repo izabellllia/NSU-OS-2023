@@ -158,7 +158,7 @@ Job* parseline(char *line)
 	return headJob;
 }
 
-static char * blankskip(register char *s)
+static char * blankskip(char *s)
 {
 	while (isspace(*s) && *s) ++s;
 	return(s);
