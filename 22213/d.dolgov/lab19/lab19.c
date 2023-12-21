@@ -177,13 +177,19 @@ void propagate(char *rawPattern) {
     char *pattern = malloc(sizeof(char) * patternLength);
 
     if (pattern == NULL) {
+        free(pattern);
+        free(rawPattern);
         perror("COULD NOT ALLOCATE MEMORY FOR PATTERN\n");
+        exit(EXIT_FAILURE);
     }
 
     strcpy(pattern, rawPattern);
 
     if (checkString(pattern) == SLASH_FOUND) {
+        free(pattern);
+        free(rawPattern);
         perror("NO SLASHES ALLOWED IN THE SEARCH PATTERN\n");
+        exit(EXIT_FAILURE);
     } else {
         findFiles(pattern, patternLength);
     }
