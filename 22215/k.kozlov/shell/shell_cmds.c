@@ -4,6 +4,7 @@
 #include <string.h>
 #include <signal.h>
 #include <stdlib.h>
+#include <ctype.h>
 
 #include "shell.h"
 #include "shell_structs.h"
@@ -50,13 +51,21 @@ int processShellSpecificMainCommand(Job* job) {
 
 static int parseFromIntFromPercentArg(char* arg) {
 	int num;
+	for (int i = 1; arg[i]; ++i) {
+		if (!isdigit(arg[i])) {
+			fprintf(stderr, "Cannot recognize background number\n");
+			return -1;
+		}
+	}
 	sscanf(arg+1, "%d", &num);
 	return num;
 }
 
 void fg_cmd(char* argNum) {
 	int bgNumber = parseFromIntFromPercentArg(argNum);
-	Job* bgJob = getJobByBgNumber(headBgJobFake, bgNumber);
+	if (bgNumber == -1)
+		return;
+	Job* bgJob = getJobByBgNumber(headBgJobFake->next, bgNumber);
 	if (!bgJob)	{
 		fprintf(stderr, "Background job %d wasn't found\n", bgNumber);
 		return;
@@ -71,7 +80,9 @@ void fg_cmd(char* argNum) {
 
 void bg_cmd(char* argNum) {
 	int bgNumber = parseFromIntFromPercentArg(argNum);
-	Job* bgJob = getJobByBgNumber(headBgJobFake, bgNumber);
+	if (bgNumber == -1)
+		return;
+	Job* bgJob = getJobByBgNumber(headBgJobFake->next, bgNumber);
 	if (!bgJob)	{
 		fprintf(stderr, "Background job %d wasn't found\n", bgNumber);
 		return;
@@ -81,7 +92,9 @@ void bg_cmd(char* argNum) {
 
 void kill_cmd(char* argNum) {
 	int bgNumber = parseFromIntFromPercentArg(argNum);
-	Job* bgJob = getJobByBgNumber(headBgJobFake, bgNumber);
+	if (bgNumber == -1)
+		return;
+	Job* bgJob = getJobByBgNumber(headBgJobFake->next, bgNumber);
 	if (!bgJob)	{
 		fprintf(stderr, "Background job %d wasn't found\n", bgNumber);
 		return;
