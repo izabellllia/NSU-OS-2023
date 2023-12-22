@@ -64,21 +64,8 @@ void constructWordExp(char** args, wordexp_t *p) {
 
 Process* createNewProcessInJob(Job* job, Command cmd) {
 	Process* newProcess = (Process*) malloc(sizeof(Process));
-	newProcess->cmd.cmdflag = cmd.cmdflag;
 	newProcess->pipesFlags = cmd.cmdflag;
 
-	int argLen = 0;
-	for (int cmdArgIndex = 0; cmdArgIndex < MAXARGS; ++cmdArgIndex) {
-		if (cmd.cmdargs[cmdArgIndex]) {
-			argLen = strlen(cmd.cmdargs[cmdArgIndex]);
-			newProcess->cmd.cmdargs[cmdArgIndex] = (char*) malloc(argLen + 1);
-			strcpy(newProcess->cmd.cmdargs[cmdArgIndex], cmd.cmdargs[cmdArgIndex]);
-			newProcess->cmd.cmdargs[cmdArgIndex][argLen] = '\0';
-		}
-		else {
-			newProcess->cmd.cmdargs[cmdArgIndex] = (char*) NULL;
-		}
-	}
 	strcat(newProcess->line, cmd.cmdargs[0]);
 	for (int argIndex = 1; cmd.cmdargs[argIndex]; argIndex++) {
 		strcat(newProcess->line, " ");
@@ -260,12 +247,9 @@ void printProcesses(Job* job) {
 }
 
 void printProcess(Process* process) {
-	fprintf(stderr, "\tProcess %d, PIPES %d\n", process->pid, process->cmd.cmdflag);
+	fprintf(stderr, "\tProcess %d, PIPES %d\n", process->pid, process->pipesFlags);
 	fprintf(stderr, "\tCode %d\n\tStatus %d\n", 
 		process->statusInfo.si_code, process->statusInfo.si_status);
-	// for (int argIndex = 0; process->cmd.cmdargs[argIndex]; argIndex++) {
-	// 	fprintf(stderr, "\t\tArg %d: %s\n", argIndex, process->cmd.cmdargs[argIndex]);
-	// }
 	for (int argIndex = 0; argIndex < process->args.we_wordc; argIndex++) {
 		fprintf(stderr, "\t\tArg %d: %s\n", argIndex, process->args.we_wordv[argIndex]);
 	}
@@ -299,17 +283,8 @@ void printJobNotification(Job* job) {
 
 void printProcessesNotification(Job* job) {
 	for (Process* proc = job->headProcess; proc; proc = proc->next) {
-		// printProcessNotification(proc);
 		fprintf(stdout, "\t%s\n", proc->line);
 	}
-}
-
-void printProcessNotification(Process* process) {
-	fprintf(stdout, "\t");
-	for (int argIndex = 0; process->cmd.cmdargs[argIndex]; argIndex++) {
-		fprintf(stdout, "%s ", process->cmd.cmdargs[argIndex]);
-	}
-	fprintf(stdout, "\n");
 }
 
 void freeJobs(Job* headJob) {
@@ -360,11 +335,6 @@ void freeProcesses(Process* headProcess) {
 	{
 		processForDeletion = currProcess;
 		currProcess = currProcess->next;
-		int cmdArgIndex = 0;
-		while (processForDeletion->cmd.cmdargs[cmdArgIndex]) {
-			free(processForDeletion->cmd.cmdargs[cmdArgIndex]);
-			cmdArgIndex++;
-		}
 		wordfree(&processForDeletion->args);
 		free(processForDeletion);
 	}

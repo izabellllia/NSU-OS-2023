@@ -11,7 +11,7 @@
 #include "shell_cmds.h"
 
 int processShellSpecificForkedCommand(Process* process) {
-	if (strcmp(process->cmd.cmdargs[0], "jobs") == 0) {
+	if (strcmp(process->args.we_wordv[0], "jobs") == 0) {
 		jobs_cmd();
 		return 1;
 	}
@@ -24,25 +24,25 @@ void jobs_cmd() {
 
 int processShellSpecificMainCommand(Job* job) {
 	Process* process = job->headProcess;
-	if (process->next || !process->cmd.cmdargs[1]) {
+	if (process->next || process->args.we_wordc < 2) {
 		return 0;
 	}
-	if (process->cmd.cmdargs[1][0] == '%') {
-		if (strcmp(process->cmd.cmdargs[0], "fg") == 0) {
-			fg_cmd(process->cmd.cmdargs[1]);
+	if (process->args.we_wordv[1][0] == '%') {
+		if (strcmp(process->args.we_wordv[0], "fg") == 0) {
+			fg_cmd(process->args.we_wordv[1]);
 			return 1;
 		}
-		if (strcmp(process->cmd.cmdargs[0], "bg") == 0) {
-			bg_cmd(process->cmd.cmdargs[1]);
+		if (strcmp(process->args.we_wordv[0], "bg") == 0) {
+			bg_cmd(process->args.we_wordv[1]);
 			return 2;
 		}
-		if (strcmp(process->cmd.cmdargs[0], "kill") == 0) {
-			kill_cmd(process->cmd.cmdargs[1]);
+		if (strcmp(process->args.we_wordv[0], "kill") == 0) {
+			kill_cmd(process->args.we_wordv[1]);
 			return 3;
 		}
 	}
-	if (strcmp(process->cmd.cmdargs[0], "cd") == 0) {
-		cd_cmd(process->cmd.cmdargs[1]);
+	if (strcmp(process->args.we_wordv[0], "cd") == 0) {
+		cd_cmd(process->args.we_wordv[1]);
 		return 4;
 	}
 	return 0;
@@ -90,11 +90,6 @@ void kill_cmd(char* argNum) {
 }
 
 void cd_cmd(char* path) {
-	if (strcmp(path, "~") == 0) {
-		path = getenv("HOME");
-	}
-	if (chdir(path) != 0) {
+	if (chdir(path) != 0)
 		perror("Failed to changed directory");
-		return;
-	}
 }

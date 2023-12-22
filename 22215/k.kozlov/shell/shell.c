@@ -57,7 +57,7 @@ int processJob(Job* job) {
 	while (nextProcess != NULL) {
 		currentProcess = nextProcess;
 		nextProcess = nextProcess->next;
-		if (currentProcess->cmd.cmdflag)
+		if (currentProcess->pipesFlags)
 			pipe(newPipes);
 		pid_t childId = fork();
 		if (childId < 0) {
@@ -81,7 +81,7 @@ int processJob(Job* job) {
 			if (processShellSpecificForkedCommand(currentProcess))
 				exit(0);
 
-			execvp(currentProcess->cmd.cmdargs[0], currentProcess->cmd.cmdargs);
+			execvp(currentProcess->args.we_wordv[0], currentProcess->args.we_wordv);
 			perror("Failed to run command");
 			exit(-1);
 		}
@@ -132,11 +132,11 @@ void setInputOutputRedirection(Job* job, Process* process, int* prevPipes, int* 
 			exit(-1);
 		}
 	}
-	if (process->cmd.cmdflag & INPIP) {
+	if (process->pipesFlags & INPIP) {
 		// fprintf(stderr, "Get input pipe from %d\n", prevPipes[0]);
 		job->inFd = prevPipes[0];
 	}
-	if (process->cmd.cmdflag & OUTPIP) {
+	if (process->pipesFlags & OUTPIP) {
 		// fprintf(stderr, "Get output pipe from %d\n", newPipes[1]);
 		job->outFd = newPipes[1];
 	}
