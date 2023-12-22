@@ -39,12 +39,25 @@ Job* createNewJob(Job* headJob) {
 	return newJob;
 }
 
+int isAnySpace(char* str) {
+	for (int i = 0; str[i]; ++i) {
+		if (str[i] == ' ')
+			return 1;
+	}
+	return 0;
+}
+
 void constructWordExp(char** args, wordexp_t *p) {
-	char line[LINE_SZ];
+	char line[LINE_SZ], isSpace = 0;
 	strcat(line, args[0]);
 	for (int argIndex = 1; args[argIndex]; argIndex++) {
+		isSpace = isAnySpace(args[argIndex]);
 		strcat(line, " ");
+		if (isSpace)
+			strcat(line, "\"");
 		strcat(line, args[argIndex]);
+		if (isSpace)
+			strcat(line, "\"");
 	}
 	wordexp(line, p, 0);
 }

@@ -37,7 +37,7 @@ int main(int argc, char *argv[]) {
 		// Пытаемся спарсить из прочитанной строки задачи и процессы в них
 		if ((newJobsHead = parseline(line)) == NULL)
 			continue;
-		printJobs(newJobsHead);
+		// printJobs(newJobsHead);
 		nextJob = newJobsHead;
 		while (nextJob != NULL) {
 			// Обновляем статусы фоновых задач перед обработкой текущей задачи для того, чтобы команда jobs показала актуальные статусы

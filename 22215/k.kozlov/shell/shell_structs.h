@@ -36,6 +36,7 @@ typedef struct process
 	char line[LINE_SZ];
 	wordexp_t args;
 	char pipesFlags;
+	Command cmd;
 	pid_t pid;
 	siginfo_t statusInfo; // Поле для сохранения статуса процесса, полученного из waitid
 	struct process* prev;
