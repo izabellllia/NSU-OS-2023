@@ -57,8 +57,12 @@ int processJob(Job* job) {
 	while (nextProcess != NULL) {
 		currentProcess = nextProcess;
 		nextProcess = nextProcess->next;
-		if (currentProcess->pipesFlags)
-			pipe(newPipes);
+		if (currentProcess->pipesFlags & OUTPIP) {
+			if (pipe(newPipes) != 0) {
+				perror("Cannot create pipe");
+				return -1;
+			}
+		}
 		pid_t childId = fork();
 		if (childId < 0) {
 			perror("Failed to launch process");
@@ -91,10 +95,14 @@ int processJob(Job* job) {
 				job->pgid = childId;
 			setpgid(childId, job->pgid);
 
-			close(prevPipes[0]);
-			close(prevPipes[1]);
-			prevPipes[0] = newPipes[0];
-			prevPipes[1] = newPipes[1];
+			if (currentProcess->pipesFlags & INPIP) {
+				close(prevPipes[0]);
+				close(prevPipes[1]);
+			}
+			if (currentProcess->pipesFlags & OUTPIP) {
+				prevPipes[0] = newPipes[0];
+				prevPipes[1] = newPipes[1];
+			}
 		}
 	}
 	if (job->initialFg) {
@@ -126,6 +134,8 @@ void setInputOutputRedirection(Job* job, Process* process, int* prevPipes, int* 
 		int flags = O_WRONLY | O_CREAT;
 		if (job->appendFlag)
 			flags |= O_APPEND;
+		else
+			flags |= O_TRUNC;
 		job->outFd = open(job->outPath, flags, 0666);
 		if (job->outFd < 0) {
 			perror("Failed to redirect output");
@@ -188,7 +198,7 @@ void waitFgJob(Job* job) {
 }
 
 int addJobToBg(Job* job) {
-	job->bgNumber = bgFreeNumber;
+	job->bgNumber = bgFreeNumber; 
 	Job* lastBgJob = headBgJobFake;
 	while (lastBgJob->next != NULL) {
 		lastBgJob = lastBgJob->next;

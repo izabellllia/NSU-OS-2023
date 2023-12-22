@@ -39,40 +39,22 @@ Job* createNewJob(Job* headJob) {
 	return newJob;
 }
 
-int isAnySpace(char* str) {
-	for (int i = 0; str[i]; ++i) {
-		if (str[i] == ' ')
-			return 1;
-	}
-	return 0;
-}
-
-void constructWordExp(char** args, wordexp_t *p) {
-	char line[LINE_SZ], isSpace = 0;
-	strcat(line, args[0]);
-	for (int argIndex = 1; args[argIndex]; argIndex++) {
-		isSpace = isAnySpace(args[argIndex]);
-		strcat(line, " ");
-		if (isSpace)
-			strcat(line, "\"");
-		strcat(line, args[argIndex]);
-		if (isSpace)
-			strcat(line, "\"");
-	}
-	wordexp(line, p, 0);
-}
-
 Process* createNewProcessInJob(Job* job, Command cmd) {
 	Process* newProcess = (Process*) malloc(sizeof(Process));
 	newProcess->pipesFlags = cmd.cmdflag;
 
+	char* specialCharPtr;
 	strcat(newProcess->line, cmd.cmdargs[0]);
 	for (int argIndex = 1; cmd.cmdargs[argIndex]; argIndex++) {
+		specialCharPtr = strpbrk(cmd.cmdargs[argIndex], " |&<>;");
 		strcat(newProcess->line, " ");
+		if (specialCharPtr)
+			strcat(newProcess->line, "\"");
 		strcat(newProcess->line, cmd.cmdargs[argIndex]);
+		if (specialCharPtr)
+			strcat(newProcess->line, "\"");
 	}
 	wordexp(newProcess->line, &newProcess->args, 0);
-	// constructWordExp(cmd.cmdargs, &newProcess->args);
 	newProcess->pid = 0;
 	newProcess->statusInfo.si_code = 0;
 	newProcess->statusInfo.si_status = 0;
@@ -121,8 +103,6 @@ Process* getProcessByPid(Job* job, pid_t pid) {
 
 void updateJobStatus(Job* job) {
 	char oldStatus = job->status;
-	// if (isJobRunning(job))
-	// 	job->status = J_RUNNING;
 	if (isJobDone(job))
 		job->status = J_DONE;
 	else if (isJobExited(job))
@@ -299,26 +279,12 @@ void freeJobs(Job* headJob) {
 }
 
 void freeJob(Job* job) {
-	if (job->pgid != 0)
-		killZombies(job);
 	freeProcesses(job->headProcess);
 	if (job->inPath)
 		free(job->inPath);
 	if (job->outPath)
 		free(job->outPath);
 	free(job);
-}
-
-void killZombies(Job* job) {
-	siginfo_t info;
-	int options = WEXITED | WSTOPPED | WCONTINUED | WNOHANG;
-	while (1) {
-		if (waitid(P_PGID, job->pgid, &info, options) != 0) {
-			if (errno != ECHILD)
-				perror("Error in bg jobs refining");
-			return;
-		}
-	}
 }
 
 void sendSigHups(Job* headJob) {
