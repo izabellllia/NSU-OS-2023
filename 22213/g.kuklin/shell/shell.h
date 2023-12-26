@@ -1,10 +1,17 @@
 #define MAXARGS 256
 #define MAXCMDS 50
+#define MAXSQNCS 16
 
 struct command {
     char *cmdargs[MAXARGS];
     char cmdflag;
     char *infile, *outfile;
+};
+
+struct command_sequence {
+    struct command *cmds;
+    int cnt;
+    char background;
 };
 
 /*  cmdflag's  */
@@ -16,9 +23,7 @@ struct command {
 
 #define OUTREDIR   0x07
 
-extern struct command cmds[];
-extern char *infile, *outfile, *appfile;
-extern char bkgrnd;
+extern struct command_sequence cmds[];
 
-int parseline(char *);
+int parseline(char *, struct command_sequence *);
 int promptline(char *, char *, int);

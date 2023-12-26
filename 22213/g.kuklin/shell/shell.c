@@ -17,9 +17,6 @@
 #define JOBS_BUFFER_SIZE 128
 #define MAX_LINE_WIDTH 1024
 
-struct command cmds[MAXCMDS];
-char bkgrnd;
-
 typedef struct {
     pid_t process;
     struct command *cmds;
@@ -61,7 +58,7 @@ int wait_for_process(pid_t pid) {
     return info.si_code == CLD_EXITED ? info.si_status : NOT_AN_EXIT_STATUS;
 }
 
-void run_child(struct command cmd, pid_t pgid, int prev_pipe, int cur_pipe) {
+void run_child(struct command cmd, pid_t pgid, int prev_pipe, int cur_pipe, char bkgrnd) {
     if (strcmp("fg", cmd.cmdargs[0]) == 0) {
         fprintf(stderr, "fg: no job control");
         exit(1);
@@ -88,7 +85,7 @@ void run_child(struct command cmd, pid_t pgid, int prev_pipe, int cur_pipe) {
             out = open(cmd.outfile, O_WRONLY | O_APPEND);
 
         if (out == -1)
-            fail("Failed to open file");    
+            fail("Failed to open output file");    
 
         if (dup2(out, 1) == -1)
             fail("Failed to redirect output to file");
@@ -117,34 +114,30 @@ void run_child(struct command cmd, pid_t pgid, int prev_pipe, int cur_pipe) {
 
 int add_job(const char *buffer, int size, struct command *commands, int ncmds, pid_t process) {
     if (job_count == JOBS_BUFFER_SIZE) {
-        printf("Out of job slots");
+        fprintf(stderr, "Out of job slots");
         return -1;
     }
     int job_id = job_count;
+    jobs[job_id].ncmds = ncmds;
+    jobs[job_id].process = process;
+    jobs[job_id].buffer = malloc(size + 1);
+    char *to = jobs[job_id].buffer;
+    if (to == NULL)
+        fail("Failed to allocate memory for job buffer");
     jobs[job_id].cmds = malloc(sizeof(struct command) * ncmds);
     struct command *to_cmds = jobs[job_id].cmds;
     if (to_cmds == NULL)
         fail("Failed to allocate memory for commands");
 
     memcpy(to_cmds, commands, sizeof(struct command) * ncmds);
-    jobs[job_id].ncmds = ncmds;
-    jobs[job_id].buffer = malloc(size + 1);
-    jobs[job_id].process = process;
-    char *to = jobs[job_id].buffer;
-    if (to == NULL)
-        fail("Failed to allocate memory for job buffer");
-
     memcpy(to, buffer, size);
     for (int i = 0; i < ncmds; i++) {
-        if (to_cmds[i].infile) {
+        if (to_cmds[i].infile)
             to_cmds[i].infile = (to_cmds[i].infile - buffer) + to;
-        }
-        if (to_cmds[i].outfile) {
+        if (to_cmds[i].outfile)
             to_cmds[i].outfile = (to_cmds[i].outfile - buffer) + to;
-        }
-        for (int j = 0; to_cmds[i].cmdargs[j]; j++) {
+        for (int j = 0; to_cmds[i].cmdargs[j]; j++)
             to_cmds[i].cmdargs[j] = (to_cmds[i].cmdargs[j] - buffer) + to;
-        }
     }
 
     int job_handle = -1;
@@ -161,8 +154,8 @@ int add_job(const char *buffer, int size, struct command *commands, int ncmds, p
 
 void remove_job(int handle) {
     int id = job_index[handle];
-    assert(id >= 0);
-    assert(id < job_count);
+    assert(id >= 0 && "Negative job id");
+    assert(id < job_count && "Out of bounds job id");
     free(jobs[id].buffer);
     free(jobs[id].cmds);
     memmove(&jobs[id], &jobs[id+1], sizeof(job_t) * (job_count - id));
@@ -174,24 +167,21 @@ void remove_job(int handle) {
     job_count--;
 }
 
-int get_job_from_argument(int id) {
+int get_job_from_argument(struct command cmd) {
     if (job_count == 0) {
         fprintf(stderr, "No jobs to manipulate\n");
-        fflush(stderr);
         return -1;
     }
 
     int job = 0;
-    if (cmds[id].cmdargs[1]) {
-        if (cmds[id].cmdargs[2]) {
+    if (cmd.cmdargs[1]) {
+        if (cmd.cmdargs[2]) {
             fprintf(stderr, "Invalid number of arguments\n");
-            fflush(stderr);
             return -1;
         }
-        int arg = atoi(cmds[id].cmdargs[1]);
+        int arg = atoi(cmd.cmdargs[1]);
         if (arg <= 0 || arg > JOBS_BUFFER_SIZE || job_index[arg - 1] == -1) {
             fprintf(stderr, "Invalid job index\n");
-            fflush(stderr);
             return -1;
         }
         job = arg - 1;
@@ -202,20 +192,21 @@ int get_job_from_argument(int id) {
             job++;
         assert(job_index[job] == job_count - 1);
     }
-    fflush(stdout);
     return job;
 }
 
 // if pgid is zero commands are non-blocking under this shell
-int process_command_sequence(int ncmds, int interactive, int orig_pgid) {
+int process_command_sequence(struct command_sequence sqnc, int interactive, int orig_pgid) {
     int should_continue = 1;
     int pipe_ends[2] = {-1, -1};
     int pgid = orig_pgid;
-    for (int j = 0; j < ncmds && should_continue; j++) {
-        if (interactive && strcmp("fg", cmds[j].cmdargs[0]) == 0) {
-            int handle = get_job_from_argument(j);    
+    for (int j = 0; j < sqnc.cnt && should_continue; j++) {
+        // Check for internal commands like fg, bg (could be other)
+        if (interactive && strcmp("fg", sqnc.cmds[j].cmdargs[0]) == 0) {
+            int handle = get_job_from_argument(sqnc.cmds[j]);    
             if (handle == -1) {
                 should_continue = 0;
+                fflush(stderr); // Force error on screen
                 continue;
             }
 
@@ -238,8 +229,8 @@ int process_command_sequence(int ncmds, int interactive, int orig_pgid) {
             }
             continue;
         }
-        if (interactive && strcmp("bg", cmds[j].cmdargs[0]) == 0) {
-            int handle = get_job_from_argument(j);    
+        if (interactive && strcmp("bg", sqnc.cmds[j].cmdargs[0]) == 0) {
+            int handle = get_job_from_argument(sqnc.cmds[j]); 
             if (handle == -1) {
                 should_continue = 0;
                 continue;
@@ -249,7 +240,7 @@ int process_command_sequence(int ncmds, int interactive, int orig_pgid) {
             continue;
         }
 
-        if (!(cmds[j].cmdflag & INPIPE)) {
+        if (!(sqnc.cmds[j].cmdflag & INPIPE)) {
             pgid = orig_pgid;
             pipe_ends[0] = -1;
             pipe_ends[1] = -1;
@@ -261,7 +252,7 @@ int process_command_sequence(int ncmds, int interactive, int orig_pgid) {
                 fail("Failed to close prev input pipe");
             last_pipe[0] = -1;
         }
-        if (cmds[j].cmdflag & OUTPIPE) {
+        if (sqnc.cmds[j].cmdflag & OUTPIPE) {
             if (pipe(pipe_ends) == -1)
                 fail("Failed to open a pipe");
         }
@@ -270,18 +261,18 @@ int process_command_sequence(int ncmds, int interactive, int orig_pgid) {
         switch (child) {
             case -1: fail("Failed to fork"); break; // Fall-through warning elision
             case 0:
-                /* This is a child process */
-                run_child(cmds[j], pgid, last_pipe[1], pipe_ends[0]);
+                // This is a child process
+                run_child(sqnc.cmds[j], pgid, last_pipe[1], pipe_ends[0], !interactive);
                 // Control flow should never return here
                 assert(0);
             default:
                 if (!pgid)
                     pgid = child;
-                /* This is a shell process */
+                // This is a shell process
                 if (setpgid(child, pgid) != 0)
-                    fail("Failed to set child process group");    
+                    fail("Failed to set child process group");
 
-                if (cmds[j].cmdflag & OUTPIPE)
+                if (sqnc.cmds[j].cmdflag & OUTPIPE)
                     continue;
 
                 if (interactive && tcsetpgrp(shell_terminal, pgid) != 0)
@@ -299,7 +290,7 @@ int process_command_sequence(int ncmds, int interactive, int orig_pgid) {
                     should_continue = !info.si_status;
                 } else if (info.si_code == CLD_STOPPED) {
                     should_continue = 0;
-                    int id = add_job(line, sizeof(line), cmds, ncmds, pgid);
+                    int id = add_job(line, sizeof(line), &sqnc.cmds[j], 1, pgid);
                     printf("\n[%d] %d Stopped\n", id + 1, pgid);
                     fflush(stdout);
                 } else if (info.si_code == CLD_KILLED || info.si_code == CLD_DUMPED) {
@@ -311,13 +302,19 @@ int process_command_sequence(int ncmds, int interactive, int orig_pgid) {
                 fail("Failed to close prev output pipe");
             last_pipe[1] = -1;
         }
-    } /* close for */
+    } // close for
     return should_continue ? 0 : 1;
 }
 
 int main() {
-    int ncmds;
+    int nsqnc;
     char prompt[50];      /* shell prompt */
+    struct command_sequence sqncs[MAXSQNCS];
+    for (int i = 0; i < MAXSQNCS; i++) {
+        sqncs[i].cmds = malloc(sizeof(struct command) * MAXCMDS); 
+        if (!sqncs[i].cmds)
+            fail("Failed to allocate memory for commands"); 
+    }
 
     shell_pgid = getpid();
     shell_terminal = STDIN_FILENO;
@@ -334,6 +331,7 @@ int main() {
     sigignore(SIGQUIT);
     sigignore(SIGTTOU);
     sigignore(SIGTTIN);
+    sigignore(SIGTSTP);
 
     for (int i = 0; i < JOBS_BUFFER_SIZE; i++)
         job_index[i] = -1;
@@ -358,7 +356,7 @@ int main() {
             }
         }
 
-        if ((ncmds = parseline(line)) < 0) {
+        if ((nsqnc = parseline(line, sqncs)) < 0) {
             #ifdef DEBUG
             fprintf(stderr, "Unrecognised command\n");
             #endif
@@ -367,47 +365,53 @@ int main() {
 
         #ifdef DEBUG
         {
-            fprintf(stderr, "ncmds = %d\n", ncmds);
-            fprintf(stderr, "bkgrnd = %d\n", bkgrnd);
-            int i, j;
-            for (i = 0; i < ncmds; i++) {
-                for (j = 0; cmds[i].cmdargs[j] != (char *) NULL; j++)
-                    fprintf(stderr, "cmd[%d].cmdargs[%d] = %s\n", i, j, cmds[i].cmdargs[j]);
-                fprintf(stderr, "cmds[%d].cmdflag = %x\n", i, cmds[i].cmdflag);
+            fprintf(stderr, "nsqnc = %d\n", nsqnc);
+            for (int k = 0; k < nsqnc; k++) {
+                for (int i = 0; i < sqncs[k].cnt; i++) {
+                    for (int j = 0; sqncs[k].cmds[i].cmdargs[j] != (char *) NULL; j++)
+                        fprintf(stderr, "cmd[%d].cmdargs[%d] = %s\n", i, j, sqncs[k].cmds[i].cmdargs[j]);
+                    fprintf(stderr, "cmds[%d].cmdflag = %x\n", i, sqncs[k].cmds[i].cmdflag);
+                }
+                fprintf(stderr, "bkgrnd = %d\n", sqncs[k].background);
             }
         }
         #endif
 
-        if (ncmds == 0)
+        if (nsqnc == 0)
             continue;
 
-        if (bkgrnd) {
-            pid_t process = fork();
-            switch (process) {
-                case -1: fail("Failed to fork shell process"); break; // Fall-through warning elision
-                case 0: {
-                    pid_t self = getpid();
-                    if (setpgid(self, self))
-                        fail("Failed to set shell's another pgid");
+        for (int i = 0; i < nsqnc; i++) {
+            if (sqncs[i].background) {
+                pid_t process = fork();
+                switch (process) {
+                    case -1: fail("Failed to fork shell process"); break; // Fall-through warning elision
+                    case 0: {
+                        pid_t self = getpid();
+                        if (setpgid(self, self))
+                            fail("Failed to set shell's another pgid");
 
-                    if (ncmds > 1) {
-                        exit(process_command_sequence(ncmds, 0, self));
-                    } else {
-                        run_child(cmds[0], self, 0, 0);
+                        if (sqncs[i].cnt > 1) {
+                            exit(process_command_sequence(sqncs[i], 0, self));
+                        } else {
+                            run_child(sqncs[i].cmds[0], self, 0, 0, 1);
+                        }
+                        assert(0);
                     }
-                    assert(0);
+                    default:
+                        if (setpgid(process, process) != 0)
+                            fail("Failed to set background task's pgid");
                 }
-                default:
-                    if (setpgid(process, process) != 0)
-                        fail("Failed to set background task's pgid");
-            }
 
-            int id = add_job(line, sizeof(line), cmds, ncmds, process);
-            printf("[%d] %d\n", id + 1, process);
-            fflush(stdout);
-            continue; // Next prompt
-        } /* end bkrnd */
+                int id = add_job(line, sizeof(line), sqncs[i].cmds, sqncs[i].cnt, process);
+                printf("[%d] %d\n", id + 1, process);
+                fflush(stdout);
+                continue; // Next prompt
+            } // end bkrnd
 
-        process_command_sequence(ncmds, 1, 0);
-    }/* close while */
+            process_command_sequence(sqncs[i], 1, 0);
+        } // close for
+    } // close while
+    for (int i = 0; i < MAXSQNCS; i++)
+       free(sqncs[i].cmds);
+    return 0;
 }
