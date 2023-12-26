@@ -24,6 +24,7 @@ int main(int argc, char *argv[]) {
 	strncpy(socket_address.sun_path, socket_path, sizeof(socket_address.sun_path) - 1);
 
 	if (connect(file_descriptor, (struct sockaddr*)&socket_address, sizeof(socket_address)) == -1) {
+		close(file_descriptor);
 		perror("connect error");
 		exit(EXIT_FAILURE);
 	}
@@ -31,16 +32,17 @@ int main(int argc, char *argv[]) {
 	char buffer[BUFSIZ];
 	ssize_t read_bytes;
 
-	memset(buffer, 0, sizeof(buffer));
 	while ((read_bytes = read(STDIN_FILENO, buffer, sizeof(buffer))) > 0) {
 		if (write(file_descriptor, buffer, read_bytes) != read_bytes) {
 			if (read_bytes > 0) {
 				fprintf(stderr, "partial write");
 			} else {
+				close(file_descriptor);
 				perror("write error");
 				exit(EXIT_FAILURE);
 			}
 		}
 	}
+	close(file_descriptor);
 	exit(EXIT_SUCCESS);
 }
