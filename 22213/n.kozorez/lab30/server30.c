@@ -28,22 +28,25 @@ int main(int argc, char *argv[]) {
 	addr.sun_family = AF_UNIX;
 	strncpy(addr.sun_path, socket_path, sizeof(addr.sun_path) - 1);
 
+	unlink(socket_path);
 
 	if (bind(server_descriptor, (struct sockaddr*)&addr, sizeof(addr)) == -1) {
+		close(server_descriptor);
 		perror("bind error");
 		exit(EXIT_FAILURE);
 	}
 
-	signal(SIGINT, signal_handle);
 
 	if (listen(server_descriptor, 5) == -1) {
 		unlink(socket_path);
+		close(server_descriptor);
 		perror("listen error");
 		exit(EXIT_FAILURE);
 	}
 
 	if ((client_descriptor = accept(server_descriptor, NULL, NULL)) == -1) {
 		unlink(socket_path);
+		close(server_descriptor);
 		perror("accept error");
 		exit(EXIT_FAILURE);
 	}
@@ -62,8 +65,14 @@ int main(int argc, char *argv[]) {
 
 	if (read_bytes == -1) {
 		perror("read error");
+		close(server_descriptor);
+		close(client_descriptor);
 		exit(EXIT_FAILURE);
-	} else if (read_bytes == 0) {
-        exit(EXIT_SUCCESS);
+
 	}
+
+	close(server_descriptor);
+	close(client_descriptor);
+	exit(EXIT_SUCCESS);
+
 }
