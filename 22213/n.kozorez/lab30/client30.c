@@ -4,11 +4,13 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
+#include <signal.h>
 
 char *socket_path = "./socket";
+void sigPipeHandler();
 
 int main(int argc, char *argv[]) {
-
+	signal(SIGPIPE, sigPipeHandler);
 	struct sockaddr_un socket_address;
 
 	int file_descriptor;
@@ -25,7 +27,7 @@ int main(int argc, char *argv[]) {
 
 	if (connect(file_descriptor, (struct sockaddr*)&socket_address, sizeof(socket_address)) == -1) {
 		close(file_descriptor);
-		perror("connect error");
+		perror("failed to connect to the server");
 		exit(EXIT_FAILURE);
 	}
 
@@ -45,4 +47,14 @@ int main(int argc, char *argv[]) {
 	}
 	close(file_descriptor);
 	exit(EXIT_SUCCESS);
+}
+
+
+void sigPipeHandler() {
+    if (descriptor != -1) {
+        close(descriptor);
+        write(STDERR_FILENO, "Error when writing to the socket!\n", 35);
+    }
+
+    exit(EXIT_FAILURE);
 }
