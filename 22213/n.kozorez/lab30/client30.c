@@ -9,11 +9,11 @@
 char *socket_path = "./socket";
 void sigPipeHandler();
 
+int file_descriptor = -1;
+
 int main(int argc, char *argv[]) {
 	signal(SIGPIPE, sigPipeHandler);
 	struct sockaddr_un socket_address;
-
-	int file_descriptor;
 
 	file_descriptor = socket(AF_UNIX, SOCK_STREAM, 0);
 	if (file_descriptor == -1) {
