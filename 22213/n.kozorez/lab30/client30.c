@@ -51,8 +51,8 @@ int main(int argc, char *argv[]) {
 
 
 void sigPipeHandler() {
-    if (descriptor != -1) {
-        close(descriptor);
+    if (file_descriptor != -1) {
+        close(file_descriptor);
         write(STDERR_FILENO, "Error when writing to the socket!\n", 35);
     }
 
