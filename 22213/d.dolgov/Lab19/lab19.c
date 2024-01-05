@@ -53,8 +53,6 @@ void parseLetter(const char *pattern_, char *newPattern, int i, int *counter) {
         (*counter)++;
         newPattern[*counter] = '9';
         (*counter)++;
-        newPattern[*counter] = '_';
-        (*counter)++;
         newPattern[*counter] = '\\';
         (*counter)++;
         newPattern[*counter] = '.';
@@ -107,6 +105,10 @@ void buildRegexp(char *pattern_, int patternLength) {
 void readFiles(DIR *folder, int *notFoundFlag) {
 
     while ((file = readdir(folder))) {
+        if (strcmp(file->d_name, ".") == 0 || strcmp(file->d_name, "..") == 0) {
+            continue;
+        }
+
         errno = 0;
 
         char *fileName = malloc(sizeof(char) * (strlen(file->d_name) + 1));
