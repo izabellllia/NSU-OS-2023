@@ -41,6 +41,7 @@ int main() {
     int newsockfd;
     newsockfd = accept(sockfd, NULL, NULL);
     if (newsockfd == -1) {
+        unlink(SERVER_NAME);
         close(sockfd);
         perror("accept() caused an error ");
         exit(EXIT_FAILURE);
@@ -69,6 +70,7 @@ int main() {
         exit(EXIT_FAILURE);
     }
 
+    unlink(SERVER_NAME);
     close(newsockfd);
     close(sockfd);
     exit(EXIT_FAILURE);
