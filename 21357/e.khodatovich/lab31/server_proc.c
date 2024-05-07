@@ -20,7 +20,7 @@ void unlink_sock_file_on_exit()
 
 void sigcatch(int sig)
 {
-	if (sig == SIGINT && !access(SOCK_PATH, F_OK))
+	if (sig = SIGINT && !access(SOCK_PATH, F_OK))
 	{
 		unlink(SOCK_PATH);
 	}
