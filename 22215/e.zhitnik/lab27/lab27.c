@@ -23,14 +23,10 @@ int main(int argc, char *argv[]) {
     }
 
     while (fgets(input, BUFSIZ, fin) != NULL) {
-        if (strlen(input) == 1 && input[0] == '\n') {
-            fputs(input, fpout);
-            fflush(fpout);
-        }
+        fputs(input, fpout);
     }
 
     fclose(fin);
     pclose(fpout);
     return 0;
 }
-
