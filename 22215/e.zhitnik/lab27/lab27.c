@@ -23,7 +23,9 @@ int main(int argc, char *argv[]) {
     }
 
     while (fgets(input, BUFSIZ, fin) != NULL) {
-        fputs(input, fpout);
+        if (strlen(input) == 1 && input[0] == '\n') {
+            fputs(input, fpout);
+        }
     }
 
     fclose(fin);
