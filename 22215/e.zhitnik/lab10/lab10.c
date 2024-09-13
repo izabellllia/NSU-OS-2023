@@ -30,14 +30,11 @@ int main(int argc, char * argv[]){
     }
     
     if (WIFEXITED(status)) {
-        fprintf(stderr, "Child process exited with code: %d\n", WEXITSTATUS(status));
+        printf("The child process exit status is %d\n", WEXITSTATUS(status));
     }
 
     else if (WIFSIGNALED(status)) {
-        fprintf(stderr, "Child process was terminated by signal: %d\n", WTERMSIG(status));
-    } else {
-        fprintf(stderr, "Child process ended abnormally\n");
-        return 1;
+        printf("The child process exited signal is %d\n", WTERMSIG(status));
     }
     
     return 0;
