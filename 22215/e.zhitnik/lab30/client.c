@@ -5,13 +5,13 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <unistd.h>
-#define BUFF_SIZE 32
+
+#define BUFF_SIZE 256
 char *socket_path = "mySocket";
 
 int main(int argc, char *argv[]){
     int client_fd;
     struct sockaddr_un addr;
-    char buff[100];
     if ((client_fd = socket(AF_UNIX, SOCK_STREAM, 0)) < 0)
     {
         perror("socket errror");
@@ -26,9 +26,14 @@ int main(int argc, char *argv[]){
     if (connect(client_fd, (struct sockaddr*)&addr, sizeof(addr)) == -1) {
         perror("connect error");
         exit(-1);
-      }
-    char messageWr[BUFF_SIZE] = "SuPeR sTrInG";
-    write(client_fd, messageWr, BUFF_SIZE);
+    }
+    char messageWr[BUFF_SIZE] = "";
+    int len = 0;
+    while ((len = read(STDIN_FILENO, messageWr, BUFF_SIZE-1)) > 0) {
+        if (write(client_fd, messageWr, len) == -1) {
+            break;
+        }
+    }
     close(client_fd);
 }
 
