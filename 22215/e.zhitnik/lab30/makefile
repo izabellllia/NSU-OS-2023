@@ -2,6 +2,6 @@ main:
 	make server
 	make client
 server:
-	gcc -Wall server.c -o server.out
+	gcc -Wall -lsocket server.c -o server.out
 client:
-	gcc -Wall client.c -o client.out
+	gcc -Wall -lsocket client.c -o client.out
