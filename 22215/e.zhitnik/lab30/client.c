@@ -7,7 +7,8 @@
 #include <unistd.h>
 
 #define BUFF_SIZE 256
-char *socket_path = "mySocket";
+
+const char *SOCKET_PATH = "mySocket";
 
 int main(int argc, char *argv[]){
     int client_fd;
@@ -22,7 +23,7 @@ int main(int argc, char *argv[]){
 
     addr.sun_family = AF_UNIX;
 
-    strncpy(addr.sun_path, socket_path, sizeof(addr.sun_path) - 1);
+    strncpy(addr.sun_path, SOCKET_PATH, sizeof(addr.sun_path) - 1);
     if (connect(client_fd, (struct sockaddr*)&addr, sizeof(addr)) == -1) {
         perror("connect error");
         exit(-1);
@@ -31,8 +32,12 @@ int main(int argc, char *argv[]){
     int len = 0;
     while ((len = read(STDIN_FILENO, messageWr, BUFF_SIZE-1)) > 0) {
         if (write(client_fd, messageWr, len) == -1) {
+            perror("write error");
             break;
         }
+    }
+    if (len == -1) {
+        perror("read error");
     }
     close(client_fd);
 }

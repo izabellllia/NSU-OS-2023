@@ -8,7 +8,8 @@
 #include <signal.h>
 
 #define BUFF_SIZE 256
-#define SOCKET_PATH "mySocket"
+
+const char *SOCKET_PATH = "mySocket";
 int server_fd;
 
 void normalExit() {
@@ -43,7 +44,7 @@ int main(int argc, char *argv[])
     {
         perror("bind error");
         exit(EXIT_FAILURE);
-      }
+    }
     
     atexit(finishSocketWork);
     
@@ -64,6 +65,7 @@ int main(int argc, char *argv[])
         for (int i = 0; i < len; i++){
             if (putchar(toupper(messageRd[i])) == EOF) {
                 perror("error while printing");
+                exit(EXIT_FAILURE);
             }
         }
     }
